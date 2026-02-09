@@ -1,14 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-family-display: 'Inter', system-ui, sans-serif;
-
-  --color-electric: #6366f1;
-  --color-electric-bright: #818cf8;
-  --color-neon: #f97316;
-  --color-neon-bright: #fb923c;
-  --color-cyber: #06b6d4;
-  --color-cyber-bright: #22d3ee;
+  --font-family-serif: 'Spectral', Georgia, serif;
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --color-warm: #e8e4df;
+  --color-muted: #6b6560;
+  --color-accent: #c9a87c;
 }
 
 * {
@@ -22,110 +19,115 @@ html {
 }
 
 body {
-  font-family: var(--font-family-display);
-  background: #0a0a0f;
-  color: #ffffff;
+  font-family: var(--font-family-sans);
+  background: #0a0a0a;
+  color: var(--color-warm);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Animated gradient background */
-.gradient-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.3), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 50%, rgba(249, 115, 22, 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(6, 182, 212, 0.15), transparent),
-    #0a0a0f;
+::selection {
+  background: var(--color-accent);
+  color: #0a0a0a;
 }
 
-/* Glowing text effect */
-.glow-text {
-  text-shadow:
-    0 0 20px rgba(99, 102, 241, 0.5),
-    0 0 40px rgba(99, 102, 241, 0.3),
-    0 0 60px rgba(99, 102, 241, 0.2);
+/* Typography */
+.font-serif {
+  font-family: var(--font-family-serif);
 }
 
-/* Animated border */
-.animated-border {
+/* Subtle fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+/* Section divider */
+.section-divider {
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-muted), transparent);
+}
+
+/* Minimal button */
+.btn-minimal {
   position: relative;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(6, 182, 212, 0.1));
-  border-radius: 16px;
-}
-
-.animated-border::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  padding: 1px;
-  background: linear-gradient(135deg, #6366f1, #06b6d4, #f97316);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: borderRotate 4s linear infinite;
-}
-
-@keyframes borderRotate {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
-}
-
-/* Floating animation */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.float-animation {
-  animation: float 3s ease-in-out infinite;
-}
-
-/* Pulse glow animation */
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); }
-  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.8); }
-}
-
-.pulse-glow {
-  animation: pulseGlow 2s ease-in-out infinite;
-}
-
-/* Agent node styles */
-.agent-node {
+  overflow: hidden;
   transition: all 0.3s ease;
 }
 
-.agent-node:hover {
-  transform: scale(1.1);
-  filter: brightness(1.2);
+.btn-minimal::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.3s ease;
 }
 
-/* Grid pattern overlay */
-.grid-pattern {
-  background-image:
-    linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
+.btn-minimal:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
 }
 
-/* Scrollbar styling */
+/* Input focus */
+input:focus {
+  outline: none;
+  border-color: var(--color-accent) !important;
+}
+
+/* Scrollbar - minimal */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #0a0a0a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #6366f1;
-  border-radius: 4px;
+  background: #2a2a2a;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #818cf8;
+  background: #3a3a3a;
+}
+
+/* Prose styling for manifesto content */
+.manifesto-section h3 {
+  font-family: var(--font-family-serif);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.manifesto-section p {
+  line-height: 1.8;
+}
+
+.manifesto-section strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Number styling */
+.section-number {
+  font-family: var(--font-family-serif);
+  font-style: italic;
+  color: var(--color-muted);
 }
