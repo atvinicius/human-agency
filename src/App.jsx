@@ -17,14 +17,17 @@ const stagger = {
 
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 px-6 py-6">
-      <div className="max-w-4xl mx-auto flex items-center justify-between">
-        <a href="/" className="font-serif text-xl tracking-tight">
+    <header style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, padding: '1.5rem' }}>
+      <div style={{ maxWidth: '56rem', marginLeft: 'auto', marginRight: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <a href="/" className="font-serif" style={{ fontSize: '1.25rem', letterSpacing: '-0.025em', color: '#e8e4df', textDecoration: 'none' }}>
           Human Agency
         </a>
         <a
           href="#waitlist"
-          className="text-sm text-[#6b6560] hover:text-[#e8e4df] transition-colors btn-minimal"
+          className="btn-minimal"
+          style={{ fontSize: '0.875rem', color: '#6b6560', textDecoration: 'none', transition: 'color 0.3s' }}
+          onMouseEnter={(e) => e.target.style.color = '#e8e4df'}
+          onMouseLeave={(e) => e.target.style.color = '#6b6560'}
         >
           Join Waitlist
         </a>
@@ -35,46 +38,53 @@ function Header() {
 
 function Hero() {
   return (
-    <section className="min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-32">
+    <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6rem 1.5rem 8rem' }}>
       <motion.div
         initial="hidden"
         animate="visible"
         variants={stagger}
-        className="max-w-3xl mx-auto text-center"
+        style={{ maxWidth: '48rem', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center', width: '100%' }}
       >
         <motion.p
           variants={fadeUp}
-          className="text-[#6b6560] text-sm tracking-widest uppercase mb-8"
+          style={{ color: '#6b6560', fontSize: '0.875rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2rem' }}
         >
           A Manifesto
         </motion.p>
 
         <motion.h1
           variants={fadeUp}
-          className="font-serif text-4xl md:text-6xl lg:text-7xl font-medium leading-tight mb-8 tracking-tight"
+          className="font-serif"
+          style={{ fontSize: 'clamp(2rem, 8vw, 4.5rem)', fontWeight: 500, lineHeight: 1.1, marginBottom: '2rem', letterSpacing: '-0.025em', color: '#e8e4df' }}
         >
           The Economic Case for the Infinite Individual
         </motion.h1>
 
-        <motion.div variants={fadeUp} className="section-divider mx-auto mb-8" />
+        <motion.div
+          variants={fadeUp}
+          className="section-divider"
+          style={{ marginLeft: 'auto', marginRight: 'auto', marginBottom: '2rem' }}
+        />
 
         <motion.p
           variants={fadeUp}
-          className="text-lg md:text-xl text-[#9a948e] leading-relaxed max-w-2xl mx-auto"
+          style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', color: '#9a948e', lineHeight: 1.7, maxWidth: '42rem', marginLeft: 'auto', marginRight: 'auto' }}
         >
           We are witnessing the most violent economic shift in history: the marginal cost of cognitive execution is collapsing to zero.
         </motion.p>
 
         <motion.div
           variants={fadeUp}
-          className="mt-16"
+          style={{ marginTop: '4rem' }}
         >
           <a
             href="#manifesto"
-            className="inline-flex items-center gap-2 text-[#6b6560] hover:text-[#e8e4df] transition-colors text-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#6b6560', fontSize: '0.875rem', textDecoration: 'none', transition: 'color 0.3s' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#e8e4df'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#6b6560'}
           >
             <span>Read the Manifesto</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight style={{ width: '1rem', height: '1rem' }} />
           </a>
         </motion.div>
       </motion.div>
@@ -91,14 +101,15 @@ function ManifestoSection({ number, title, children, id }) {
       viewport={{ once: true, margin: "-100px" }}
       variants={fadeUp}
       transition={{ duration: 0.8 }}
-      className="py-24 md:py-32 px-6 manifesto-section"
+      className="manifesto-section"
+      style={{ padding: 'clamp(4rem, 10vw, 8rem) 1.5rem' }}
     >
-      <div className="max-w-2xl mx-auto">
-        <span className="section-number text-lg mb-4 block">{number}</span>
-        <h2 className="font-serif text-3xl md:text-4xl font-medium mb-8 tracking-tight text-white">
+      <div style={{ maxWidth: '42rem', marginLeft: 'auto', marginRight: 'auto', width: '100%' }}>
+        <span className="section-number" style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'block' }}>{number}</span>
+        <h2 className="font-serif" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: 500, marginBottom: '2rem', letterSpacing: '-0.025em', color: 'white' }}>
           {title}
         </h2>
-        <div className="space-y-6 text-[#9a948e] text-lg leading-relaxed">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', color: '#9a948e', fontSize: '1.125rem', lineHeight: 1.8 }}>
           {children}
         </div>
       </div>
@@ -134,7 +145,7 @@ function Manifesto() {
         <p>
           Today, if a human tries to manage 100 AI agents, they drown in noise. We lack the orchestration layer to wield the power we have created.
         </p>
-        <p className="text-white">
+        <p style={{ color: 'white' }}>
           Without this layer, human value collapses. With it, human value becomes infinite.
         </p>
       </ManifestoSection>
@@ -146,15 +157,15 @@ function Manifesto() {
         <p>
           In this new economy, the human does not compete with the machine on execution—writing code, analyzing data, generating pixels. The human monopolizes <strong>Intent</strong> and <strong>Judgment</strong>.
         </p>
-        <div className="py-6 space-y-4">
-          <p className="text-white">
-            <span className="text-[#c9a87c]">AI solves.</span> Humans define <em>what</em> to solve.
+        <div style={{ padding: '1.5rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ color: 'white' }}>
+            <span style={{ color: '#c9a87c' }}>AI solves.</span> Humans define <em>what</em> to solve.
           </p>
-          <p className="text-white">
-            <span className="text-[#c9a87c]">AI explores.</span> Humans define the <em>boundary</em>.
+          <p style={{ color: 'white' }}>
+            <span style={{ color: '#c9a87c' }}>AI explores.</span> Humans define the <em>boundary</em>.
           </p>
-          <p className="text-white">
-            <span className="text-[#c9a87c]">AI generates.</span> Humans provide the <em>sanction</em>.
+          <p style={{ color: 'white' }}>
+            <span style={{ color: '#c9a87c' }}>AI generates.</span> Humans provide the <em>sanction</em>.
           </p>
         </div>
         <p>
@@ -172,7 +183,7 @@ function Manifesto() {
         <p>
           We are building the infrastructure that validates, aggregates, and directs AI labor, ensuring that as the leverage of the machine approaches infinity, the agency of the human remains absolute.
         </p>
-        <p className="text-white font-serif text-xl md:text-2xl pt-8 italic">
+        <p className="font-serif" style={{ color: 'white', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', paddingTop: '2rem', fontStyle: 'italic' }}>
           We do not save labor. We transcend it.
         </p>
       </ManifestoSection>
@@ -193,39 +204,64 @@ function Waitlist() {
   };
 
   return (
-    <section id="waitlist" className="py-32 px-6">
+    <section id="waitlist" style={{ padding: '8rem 1.5rem' }}>
       <motion.div
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true }}
         variants={fadeUp}
         transition={{ duration: 0.8 }}
-        className="max-w-xl mx-auto text-center"
+        style={{ maxWidth: '32rem', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center', width: '100%' }}
       >
         {!submitted ? (
           <>
-            <span className="section-number text-lg mb-4 block">V.</span>
-            <h2 className="font-serif text-3xl md:text-4xl font-medium mb-6 tracking-tight text-white">
+            <span className="section-number" style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'block' }}>V.</span>
+            <h2 className="font-serif" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: 500, marginBottom: '1.5rem', letterSpacing: '-0.025em', color: 'white' }}>
               Join the Movement
             </h2>
-            <p className="text-[#9a948e] text-lg mb-10">
+            <p style={{ color: '#9a948e', fontSize: '1.125rem', marginBottom: '2.5rem' }}>
               Be among the first to become a Sovereign Operator.
             </p>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="w-full px-6 py-4 bg-transparent border border-[#2a2a2a] text-[#e8e4df] placeholder-[#4a4a4a] text-center text-lg transition-colors"
                 required
+                style={{
+                  width: '100%',
+                  padding: '1rem 1.5rem',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  color: '#e8e4df',
+                  textAlign: 'center',
+                  fontSize: '1.125rem',
+                  transition: 'border-color 0.3s'
+                }}
               />
               <button
                 type="submit"
-                className="w-full px-6 py-4 bg-[#e8e4df] text-[#0a0a0a] font-medium text-lg hover:bg-white transition-colors flex items-center justify-center gap-2"
+                style={{
+                  width: '100%',
+                  padding: '1rem 1.5rem',
+                  backgroundColor: '#e8e4df',
+                  color: '#0a0a0a',
+                  fontWeight: 500,
+                  fontSize: '1.125rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'background-color 0.3s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'white'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#e8e4df'}
               >
                 <span>Request Access</span>
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight style={{ width: '1.25rem', height: '1.25rem' }} />
               </button>
             </form>
           </>
@@ -233,13 +269,24 @@ function Waitlist() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="py-8"
+            style={{ padding: '2rem 0' }}
           >
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full border border-[#c9a87c] flex items-center justify-center">
-              <Check className="w-8 h-8 text-[#c9a87c]" />
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              marginBottom: '1.5rem',
+              borderRadius: '50%',
+              border: '1px solid #c9a87c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Check style={{ width: '2rem', height: '2rem', color: '#c9a87c' }} />
             </div>
-            <h2 className="font-serif text-2xl mb-4 text-white">You're on the list</h2>
-            <p className="text-[#6b6560]">
+            <h2 className="font-serif" style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>You're on the list</h2>
+            <p style={{ color: '#6b6560' }}>
               We'll be in touch.
             </p>
           </motion.div>
@@ -251,13 +298,22 @@ function Waitlist() {
 
 function Footer() {
   return (
-    <footer className="py-16 px-6 border-t border-[#1a1a1a]">
-      <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-        <span className="font-serif text-lg">Human Agency</span>
-        <p className="text-[#4a4a4a] text-sm">
+    <footer style={{ padding: '4rem 1.5rem', borderTop: '1px solid #1a1a1a' }}>
+      <div style={{
+        maxWidth: '56rem',
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1.5rem'
+      }}>
+        <span className="font-serif" style={{ fontSize: '1.125rem' }}>Human Agency</span>
+        <p style={{ color: '#4a4a4a', fontSize: '0.875rem' }}>
           We do not save labor. We transcend it.
         </p>
-        <span className="text-[#4a4a4a] text-sm">
+        <span style={{ color: '#4a4a4a', fontSize: '0.875rem' }}>
           2026
         </span>
       </div>
@@ -267,7 +323,7 @@ function Footer() {
 
 function App() {
   return (
-    <div className="relative">
+    <div style={{ position: 'relative', width: '100%' }}>
       <Header />
       <Hero />
       <Manifesto />

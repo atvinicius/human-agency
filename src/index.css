@@ -8,7 +8,9 @@
   --color-accent: #c9a87c;
 }
 
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -25,6 +27,12 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
 }
 
 ::selection {
@@ -35,6 +43,15 @@ body {
 /* Typography */
 .font-serif {
   font-family: var(--font-family-serif);
+}
+
+/* Container centering fix */
+.container-center {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 /* Subtle fade in animation */
@@ -58,6 +75,7 @@ body {
   width: 60px;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--color-muted), transparent);
+  display: block;
 }
 
 /* Minimal button */
@@ -85,10 +103,23 @@ body {
   transform-origin: left;
 }
 
-/* Input focus */
+/* Input styling */
+input {
+  border-style: solid;
+}
+
 input:focus {
   outline: none;
   border-color: var(--color-accent) !important;
+}
+
+/* Border fix for Tailwind v4 */
+.border-subtle {
+  border: 1px solid #2a2a2a;
+}
+
+.border-top-subtle {
+  border-top: 1px solid #1a1a1a;
 }
 
 /* Scrollbar - minimal */
@@ -130,4 +161,19 @@ input:focus {
   font-family: var(--font-family-serif);
   font-style: italic;
   color: var(--color-muted);
+}
+
+/* Ensure flex centering works */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile fixes */
+@media (max-width: 640px) {
+  .container-center {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }
