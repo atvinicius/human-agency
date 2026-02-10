@@ -97,35 +97,8 @@ function Hero() {
 
         <motion.div
           variants={fadeUp}
-          style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}
+          style={{ marginTop: '3rem' }}
         >
-          <Link
-            to="/demo"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem 2rem',
-              background: 'var(--theme-accent)',
-              color: 'var(--theme-accent-text)',
-              textDecoration: 'none',
-              fontWeight: 500,
-              fontSize: '1rem',
-              transition: 'all 0.3s',
-              borderRadius: '2px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--theme-accent-hover)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--theme-accent)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <Play size={18} />
-            See the Orchestration Layer
-          </Link>
           <a
             href="#manifesto"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--theme-text-muted)', fontSize: '0.875rem', textDecoration: 'none', transition: 'color 0.3s' }}
@@ -233,8 +206,37 @@ function Manifesto() {
           We are building the infrastructure that validates, aggregates, and directs AI labor, ensuring that as the leverage of the machine approaches infinity, the agency of the human remains absolute.
         </p>
         <p className="font-serif" style={{ color: 'var(--theme-text-primary)', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', paddingTop: '2rem', fontStyle: 'italic' }}>
-          We do not save labor. We transcend it.
+          The era of the infinite individual.
         </p>
+        <div style={{ paddingTop: '3rem' }}>
+          <Link
+            to="/demo"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '1rem 2rem',
+              background: 'var(--theme-accent)',
+              color: 'var(--theme-accent-text)',
+              textDecoration: 'none',
+              fontWeight: 500,
+              fontSize: '1rem',
+              transition: 'all 0.3s',
+              borderRadius: '2px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--theme-accent-hover)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--theme-accent)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <Play size={18} />
+            See How It Works
+          </Link>
+        </div>
       </ManifestoSection>
     </div>
   );
@@ -360,7 +362,7 @@ function Footer() {
       }}>
         <span className="font-serif" style={{ fontSize: '1.125rem', color: 'var(--theme-text-primary)' }}>Human Agency</span>
         <p style={{ color: 'var(--theme-text-muted)', fontSize: '0.875rem' }}>
-          We do not save labor. We transcend it.
+          The era of the infinite individual.
         </p>
         <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.875rem' }}>
           2026
