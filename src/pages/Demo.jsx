@@ -214,7 +214,7 @@ export default function Demo() {
   const [showPresetSelector, setShowPresetSelector] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const [currentPreset, setCurrentPreset] = useState(null);
-  const [useRealAI, setUseRealAI] = useState(false);
+  const [useRealAI, setUseRealAI] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const startTimeRef = useRef(null);
 
@@ -259,8 +259,8 @@ export default function Demo() {
     startTimeRef.current = Date.now();
     setElapsedTime(0);
 
-    // For now, use mock simulation (real AI requires deployed API route)
-    // In production, this would use the orchestration service
+    // Use real AI via OpenRouter (requires OPENROUTER_API_KEY env var)
+    // Falls back to mock simulation if useRealAI is disabled
     if (useRealAI) {
       orchestratorRef.current = getOrchestrationService();
       await orchestratorRef.current.startSession(preset);

@@ -64,7 +64,7 @@ create table agents (
   pending_input jsonb, -- null if no input needed
 
   -- AI config
-  model text default 'anthropic/claude-3.5-sonnet',
+  model text default 'moonshotai/kimi-k2',
   system_prompt text,
 
   -- Timing

@@ -102,7 +102,7 @@ async function createChildAgent(parentAgent, childConfig, sessionId) {
     priority: 'normal',
     progress: 0,
     current_activity: 'Initializing...',
-    model: parentAgent.model || 'anthropic/claude-3.5-sonnet',
+    model: parentAgent.model || 'moonshotai/kimi-k2',
   };
 
   try {
@@ -194,7 +194,7 @@ Respond with a JSON object containing:
         'X-Title': 'Human Agency',
       },
       body: JSON.stringify({
-        model: agent.model || 'anthropic/claude-3.5-sonnet',
+        model: agent.model || 'moonshotai/kimi-k2',
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages,

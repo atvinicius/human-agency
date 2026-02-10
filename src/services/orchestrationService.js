@@ -31,7 +31,7 @@ function createAgentFromConfig(config, sessionId, parentId = null) {
     progress: 0,
     current_activity: 'Initializing...',
     context: config.context || {},
-    model: config.model || 'anthropic/claude-3.5-sonnet',
+    model: config.model || 'moonshotai/kimi-k2',
   };
 }
 
