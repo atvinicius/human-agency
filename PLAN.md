@@ -1,11 +1,124 @@
-# Human Agency - Agent Orchestration Interface
+# Human Agency - Development Plan
 
 ## Vision
-A visual "Mission Control" interface where humans direct swarms of AI agents. Instead of chat, it's a living map that grows left-to-right as agents spawn, work, and complete tasks.
+
+A visual "Mission Control" interface where humans direct swarms of AI agents. Instead of chat, it's a living map that grows as agents spawn, work, and complete tasks. The **Sovereign Operator** directs millions of agents — we're building the orchestration layer that makes this possible.
 
 ---
 
-## Architecture Overview
+## What's Been Built (Shipped)
+
+### Landing & Brand
+- [x] Landing page with manifesto (Zero-Cost Axiom, Ratio Crisis, Sovereign Operator, What We're Building)
+- [x] "See How It Works" CTA linking to `/demo`
+- [x] Waitlist email capture
+- [x] Dark/light theme toggle with smooth CSS transitions
+- [x] Framer Motion animations (staggered fade-ins)
+- [x] Spectral (serif) + Inter (sans-serif) typography
+
+### Agent Map & Visualization
+- [x] D3-based hierarchical agent map with pan/zoom (`AgentMap.jsx`)
+- [x] Color-coded agent nodes by role and status (`AgentNode.jsx`)
+- [x] Parent-child connection edges (`AgentEdge.jsx`)
+- [x] Zoom/pan/fit-to-view controls (`MapControls.jsx`)
+- [x] Real-time re-layout as agents spawn (`layoutEngine.js`)
+- [x] Role/status color mapping utility (`colorScheme.js`)
+
+### Interaction & Control
+- [x] Pause/Resume — individual and global (`QuickActions.jsx`, `agentStore.js`)
+- [x] Click-to-select with agent detail panel (name, role, status, objective, progress, activity)
+- [x] Human intervention panel when agent needs input (`InterventionPanel.jsx`)
+- [x] Activity stream with chronological event log (`ActivityStream.jsx`)
+
+### Real AI Integration
+- [x] Vercel Edge Function API layer (`api/agent.js`) — keeps API keys server-side
+- [x] OpenRouter integration using Kimi K2 model
+- [x] Orchestration engine with 10-iteration agent execution loop (`orchestrationService.js`)
+- [x] Role-based system prompts (coordinator, researcher, executor, validator, synthesizer)
+- [x] Structured JSON response parsing with child agent spawn directives
+- [x] Mock agent simulator as fallback (`mockAgentService.js`)
+
+### Demo System
+- [x] Preset scenario selector (`PresetSelector.jsx`, `presetService.js`)
+- [x] Solo SaaS Builder (25 agents), Investment Due Diligence (15 agents), Content Empire
+- [x] Staggered agent spawning for visual effect (500-1000ms between children)
+- [x] Mission statistics (elapsed time, agent counts, progress, estimated completion)
+
+### Infrastructure
+- [x] React 19 + Vite 7 + Tailwind CSS 4
+- [x] React Router DOM for `/` and `/demo` routes
+- [x] Zustand state management (`agentStore.js`, `themeStore.js`)
+- [x] Supabase client + optional persistence (`lib/supabase.js`)
+- [x] Vercel deployment with Edge Functions (`vercel.json`)
+- [x] Environment variable management (`.env`, `.env.example`)
+
+### Research & Strategy (docs/)
+- [x] Architecture analysis with gap identification and evolution roadmap
+- [x] Competitive landscape analysis ($5.4B → $47-52B market, 30+ competitors mapped)
+- [x] Technology catalog with adoption recommendations (Mem0, MCP, Vercel AI SDK, Langfuse)
+
+---
+
+## Current Architecture
+
+```
+User → Landing.jsx → /demo → Demo.jsx → PresetSelector
+                                  ↓
+                        OrchestrationService
+                          ↓              ↓
+                    AgentStore       /api/agent (Edge Function)
+                    (Zustand)            ↓
+                        ↓           OpenRouter → Kimi K2
+                    AgentMap             ↓
+                    (D3 viz)        Supabase (optional persist)
+```
+
+### Directory Structure
+
+```
+src/
+├── pages/
+│   ├── Landing.jsx                 # Homepage + manifesto + waitlist
+│   └── Demo.jsx                    # Orchestration demo interface
+│
+├── components/
+│   ├── map/
+│   │   ├── AgentMap.jsx            # D3 canvas with pan/zoom
+│   │   ├── AgentNode.jsx           # Agent visual nodes
+│   │   ├── AgentEdge.jsx           # Parent-child edges
+│   │   └── MapControls.jsx         # Zoom/fit controls
+│   ├── intervention/
+│   │   ├── InterventionPanel.jsx   # Human input panel
+│   │   └── QuickActions.jsx        # Pause/Resume/Dive
+│   ├── stream/
+│   │   └── ActivityStream.jsx      # Event feed
+│   ├── PresetSelector.jsx          # Demo scenario picker
+│   └── ThemeToggle.jsx             # Dark/light mode
+│
+├── services/
+│   ├── orchestrationService.js     # Core execution engine (real AI)
+│   ├── mockAgentService.js         # Fake agent simulator
+│   └── presetService.js            # Demo scenario definitions
+│
+├── stores/
+│   ├── agentStore.js               # Agents, events, filters, pause state
+│   └── themeStore.js               # Dark/light mode
+│
+├── lib/
+│   └── supabase.js                 # Supabase client init
+│
+└── utils/
+    ├── colorScheme.js              # Role/status color mapping
+    └── layoutEngine.js             # D3 hierarchical layout
+
+api/
+└── agent.js                        # Vercel Edge Function (LLM proxy)
+
+docs/
+├── architecture-analysis-llm-coordination.md
+├── market-research-competitive-landscape.md
+└── research-technologies-and-inspirations.md
+```
 
 ### Data Model
 
@@ -21,169 +134,109 @@ Agent {
 }
 ```
 
-### Directory Structure
+---
 
-```
-src/
-├── pages/
-│   ├── Landing.jsx          # Current landing page (extracted)
-│   └── Demo.jsx              # New orchestration interface
-│
-├── components/
-│   ├── map/
-│   │   ├── AgentMap.jsx      # Main canvas with pan/zoom
-│   │   ├── AgentNode.jsx     # Individual agent visual
-│   │   ├── AgentEdge.jsx     # Connection lines
-│   │   └── MapControls.jsx   # Zoom/filter controls
-│   │
-│   ├── intervention/
-│   │   ├── InterventionPanel.jsx  # Human input panel
-│   │   └── QuickActions.jsx       # Pause/Resume/Cancel
-│   │
-│   └── stream/
-│       └── ActivityStream.jsx     # Event feed
-│
-├── stores/
-│   └── agentStore.js         # Zustand state management
-│
-├── services/
-│   └── mockAgentService.js   # Demo data simulation
-│
-└── utils/
-    ├── colorScheme.js        # Role/status color mapping
-    └── layoutEngine.js       # Tree positioning algorithm
-```
+## Known Gaps
+
+Identified through architecture analysis and real-world demo usage:
+
+1. **Sequential execution** — Agents run one iteration at a time with fixed 2s delays. No parallel LLM calls, no adaptive pacing.
+2. **No context compression** — Full message history is sent every iteration. A 10-iteration agent sends the same context 10 times, wasting tokens.
+3. **Isolated agents** — No inter-agent communication. A researcher can't share findings with a sibling executor. Each agent is an island.
+4. **Dual state without sync** — Zustand is the runtime source of truth, Supabase is optional persistence. No conflict resolution, no realtime subscriptions wired up.
+5. **Agent-centric UI** — The interface shows *what agents are doing*, not *what matters*. No importance classification, no insight surfacing.
+6. **No observability** — No tracing of LLM calls, token usage, latency, costs, or error rates.
+7. **No streaming** — Responses arrive as complete blocks. No progressive output while agents think.
 
 ---
 
-## Visual Design System
+## Roadmap
 
-### Color Coding (HSL-based)
+### Phase 3: Foundation Hardening
 
-| Role | Base Hue | Visual Meaning |
-|------|----------|----------------|
-| Coordinator | Gold (45°) | Command nodes |
-| Researcher | Blue (210°) | Information gathering |
-| Executor | Green (150°) | Action taking |
-| Validator | Purple (280°) | Verification |
-| Synthesizer | Orange (30°) | Combining outputs |
+Focus: Make the existing demo reliable, efficient, and ready for real usage.
 
-**Status modifies saturation/lightness:**
-- Working: Vibrant (70% sat)
-- Paused: Dim (30% sat)
-- Blocked/Failed: Intense red
-- Completed: Faded (20% sat)
+- [ ] **Request queue with priority** — Token bucket or priority queue for concurrent agents. Critical agents get priority over background work. Prevents API rate limit issues.
+- [ ] **Context compression** — Rolling summaries or context windowing so agents don't resend full history every iteration. Reduce token waste.
+- [ ] **Streaming responses** — Migrate `api/agent.js` and `orchestrationService.js` to Vercel AI SDK. Use `useChat`/`useObject` hooks for progressive output. Replace manual fetch with SDK streaming.
+- [ ] **Event importance classification** — Tag events as critical / informational / debug. Surface critical decisions, collapse noise.
+- [ ] **Supabase as source of truth** — Wire up Realtime subscriptions. Zustand becomes a projection of server state. Optimistic updates with rollback on conflict.
 
-**Priority adds visual treatments:**
-- Critical: Pulsing glow, thick border
-- High: Subtle glow
-- Normal: Standard
-- Low/Background: Reduced opacity, smaller
+### Phase 4: Agent Cohesion
 
-### Node Anatomy
+Focus: Agents become a swarm, not a collection of isolated workers.
 
-```
-┌────────────────────────────┐
-│ ● Status    [Pause][Dive]  │  <- Header
-│ Agent Name                 │  <- Title
-│ ▓▓▓▓▓▓░░░░ 60%            │  <- Progress
-│ "Current activity..."      │  <- Activity
-└────────────────────────────┘
-```
+- [ ] **Shared context layer** — Facts Registry where agents publish discoveries. Decision Log for tracking choices made. Artifact Repository for outputs. Agents read from shared context before each iteration.
+- [ ] **Agent messaging bus** — Lightweight pub/sub so agents can notify siblings and parents. A researcher surfaces a critical finding immediately, not at end of cycle.
+- [ ] **Context injection** — Automatically inject relevant shared context into agent prompts based on role and objective. Coordinator sees everything; executor sees only what's relevant.
+- [ ] **Handoff patterns** — Structured agent-to-agent task delegation (inspired by OpenAI Agents SDK handoff model).
 
-### Grouping/Collapsing
+### Phase 5: Information Surfacing
 
-When >5 siblings share same role, auto-group into collapsed view showing count and aggregate progress.
+Focus: Shift from "watching agents work" to "seeing what matters."
 
----
+- [ ] **Multi-level information hierarchy**
+  - Level 1: Mission summary (one-line status, key metric)
+  - Level 2: Key insights and decisions requiring attention
+  - Level 3: Agent activity (current view)
+  - Level 4: Raw logs and artifacts
+- [ ] **Progressive disclosure** — Default to Level 1-2. Drill into Level 3-4 on demand.
+- [ ] **Proactive surfacing** — System highlights when something needs operator attention (conflict between agents, unexpected finding, resource concern).
+- [ ] **Importance scoring** — LLM-based classification of outputs by significance. High-importance items bubble to the top.
 
-## Interaction Patterns
+### Phase 6: Scale & Polish
 
-1. **Pan/Zoom**: Navigate the map with mouse/touch
-2. **Click Node**: Select and show detail panel
-3. **Hover**: Show quick actions (pause/dive/cancel)
-4. **Pause/Resume**: Individual or global (cascade to children)
-5. **Dive In**: Zoom + focus + show full details
-6. **Human Input**: Sliding panel for approvals/choices/text input
-7. **Redirect**: Change agent's objective mid-work
+Focus: Handle large agent trees and deliver a polished product experience.
 
----
+- [ ] **Auto-grouping** — When >5 siblings share a role, collapse into aggregate view showing count and aggregate progress.
+- [ ] **Mini-map navigation** — Overview of the full agent tree for quick navigation in large missions.
+- [ ] **Priority surfacing (attention layer)** — Visual treatment: critical agents pulse, background agents fade. Operator's eye is drawn to what matters.
+- [ ] **Performance optimization** — Virtual rendering for 100+ agent trees. Only render visible nodes.
+- [ ] **Session persistence** — Resume a mission after page reload. Full state recovery from Supabase.
+- [ ] **Template marketplace** — Share and discover preset mission templates.
 
-## Implementation Phases
+### Phase 7: Production Hardening
 
-### Phase 1: Demo MVP (First Implementation)
-- [ ] Add routing (react-router-dom)
-- [ ] Extract landing page to `pages/Landing.jsx`
-- [ ] Create `pages/Demo.jsx` with "Try Demo" button from landing
-- [ ] Install dependencies: zustand, d3-hierarchy, d3-zoom, @faker-js/faker
-- [ ] Build `AgentMap.jsx` - canvas with basic pan/zoom
-- [ ] Build `AgentNode.jsx` - styled nodes with progress
-- [ ] Build `AgentEdge.jsx` - connection lines
-- [ ] Create `agentStore.js` - state management
-- [ ] Create `mockAgentService.js` - simulate agent spawning/progress
-- [ ] Create `ActivityStream.jsx` - scrolling event feed
-- [ ] Implement color scheme utility
+Focus: From demo to real product.
 
-### Phase 2: Interaction Layer
-- [ ] Pause/Resume functionality (individual + global)
-- [ ] Click-to-focus with detail panel
-- [ ] Human input request modals
-- [ ] Visual feedback on interventions
-
-### Phase 3: Scale & Polish
-- [ ] Auto-grouping for large trees
-- [ ] Mini-map navigation
-- [ ] Priority surfacing (attention layer)
-- [ ] Performance optimization (virtual rendering)
+- [ ] **Server-side orchestration** — Move execution engine to backend. Client becomes a pure viewer. Enables long-running missions that survive tab close.
+- [ ] **Observability** — Integrate Langfuse or similar. Trace every LLM call, token usage, latency, cost. Dashboard for mission economics.
+- [ ] **MCP integration** — Adopt Model Context Protocol for tool/resource integration. Agents can use external tools (web search, file access, APIs) through a standard interface.
+- [ ] **Distributed workers** — Agent execution across multiple serverless functions or workers. Horizontal scaling.
+- [ ] **Learning system** — Agents improve over sessions. Successful patterns are captured and reused. Mission templates evolve.
+- [ ] **Auth & multi-tenancy** — User accounts, mission history, usage limits, billing.
 
 ---
 
-## New Dependencies
+## Tech Stack
 
-```json
-{
-  "react-router-dom": "^7.x",
-  "zustand": "^5.x",
-  "d3-hierarchy": "^3.x",
-  "d3-zoom": "^3.x",
-  "@faker-js/faker": "^9.x"
-}
-```
+### Current
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 19, Vite 7 |
+| Styling | Tailwind CSS 4, Framer Motion |
+| State | Zustand 5 |
+| Visualization | D3 (hierarchy, zoom, selection) |
+| Routing | React Router DOM 7 |
+| Icons | Lucide React |
+| Database | Supabase (optional) |
+| API | Vercel Edge Functions |
+| LLM | OpenRouter → Kimi K2 |
+| Mock Data | Faker.js 9 |
 
----
-
-## Files to Modify
-
-- `src/App.jsx` - Add router, keep landing at `/`, add demo at `/demo`
-- `src/index.css` - Extend theme with map-specific colors
-- `package.json` - Add new dependencies
-
-## Files to Create
-
-- `src/pages/Landing.jsx` - Extract current App content
-- `src/pages/Demo.jsx` - Orchestration interface entry
-- `src/components/map/AgentMap.jsx`
-- `src/components/map/AgentNode.jsx`
-- `src/components/map/AgentEdge.jsx`
-- `src/components/map/MapControls.jsx`
-- `src/components/stream/ActivityStream.jsx`
-- `src/stores/agentStore.js`
-- `src/services/mockAgentService.js`
-- `src/utils/colorScheme.js`
-- `src/utils/layoutEngine.js`
+### Planned Additions
+| Technology | Purpose | Phase |
+|-----------|---------|-------|
+| Vercel AI SDK | Streaming, structured output, durable agents | 3 |
+| Mem0 or custom | Shared agent memory / context layer | 4 |
+| Langfuse | LLM observability and tracing | 7 |
+| MCP | Standard tool/resource integration | 7 |
 
 ---
 
-## Verification
+## Reference Documents
 
-1. Run `npm run dev`
-2. Landing page at `/` should work as before
-3. "Try Demo" button navigates to `/demo`
-4. Demo shows animated agent map with:
-   - Nodes spawning and growing left-to-right
-   - Color-coded by role/status
-   - Progress bars animating
-   - Activity stream updating
-   - Pan/zoom working
-5. Clicking a node shows details
-6. Pause/Resume buttons work
+- `MANIFESTO.md` — Product thesis and brand positioning
+- `docs/architecture-analysis-llm-coordination.md` — Technical gap analysis and evolution roadmap
+- `docs/market-research-competitive-landscape.md` — Competitive landscape and strategic positioning
+- `docs/research-technologies-and-inspirations.md` — Technology catalog and adoption recommendations
