@@ -8,6 +8,112 @@
   --color-accent: #c9a87c;
 }
 
+/* ==================== */
+/* Theme Variables      */
+/* ==================== */
+
+:root,
+.dark-theme {
+  /* Core theme colors - Dark (default) */
+  --theme-bg: #0a0a0a;
+  --theme-surface: #141414;
+  --theme-surface-elevated: #1a1a1a;
+  --theme-grid: #1a1a1a;
+  --theme-border: #2a2a2a;
+  --theme-border-active: #4a4a4a;
+
+  /* Text colors */
+  --theme-text-primary: #e8e4df;
+  --theme-text-secondary: #9a948e;
+  --theme-text-muted: #6b6560;
+  --theme-text-inverted: #0a0a0a;
+
+  /* Accent colors */
+  --theme-accent: #c9a87c;
+  --theme-accent-hover: #e8e4df;
+  --theme-accent-text: #0a0a0a;
+  --theme-accent-muted: rgba(201, 168, 124, 0.1);
+  --theme-accent-border: rgba(201, 168, 124, 0.3);
+
+  /* Overlay */
+  --theme-overlay: rgba(0, 0, 0, 0.8);
+  --theme-backdrop: rgba(0, 0, 0, 0.5);
+
+  /* Shadows */
+  --theme-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+
+  /* Selection */
+  --theme-selection-bg: #c9a87c;
+  --theme-selection-text: #0a0a0a;
+
+  /* Map specific */
+  --map-bg: #0a0a0a;
+  --map-grid: #1a1a1a;
+  --map-node-bg: #141414;
+  --map-node-border: #2a2a2a;
+  --map-text-primary: #e8e4df;
+  --map-text-secondary: #9a948e;
+  --map-text-muted: #6b6560;
+  --map-edge-default: #2a2a2a;
+  --map-edge-active: #4a4a4a;
+
+  /* Role colors */
+  --role-coordinator: hsl(45, 70%, 50%);
+  --role-researcher: hsl(210, 70%, 50%);
+  --role-executor: hsl(150, 70%, 50%);
+  --role-validator: hsl(280, 70%, 50%);
+  --role-synthesizer: hsl(30, 70%, 50%);
+}
+
+.light-theme {
+  /* Core theme colors - Light */
+  --theme-bg: #faf9f7;
+  --theme-surface: #ffffff;
+  --theme-surface-elevated: #f5f4f2;
+  --theme-grid: #e8e4df;
+  --theme-border: #d4d0cb;
+  --theme-border-active: #b0a89e;
+
+  /* Text colors */
+  --theme-text-primary: #1a1a1a;
+  --theme-text-secondary: #4a4a4a;
+  --theme-text-muted: #7a7a7a;
+  --theme-text-inverted: #faf9f7;
+
+  /* Accent colors */
+  --theme-accent: #8b6f47;
+  --theme-accent-hover: #6b5535;
+  --theme-accent-text: #ffffff;
+  --theme-accent-muted: rgba(139, 111, 71, 0.1);
+  --theme-accent-border: rgba(139, 111, 71, 0.3);
+
+  /* Overlay */
+  --theme-overlay: rgba(255, 255, 255, 0.9);
+  --theme-backdrop: rgba(0, 0, 0, 0.3);
+
+  /* Shadows */
+  --theme-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+
+  /* Selection */
+  --theme-selection-bg: #8b6f47;
+  --theme-selection-text: #ffffff;
+
+  /* Map specific */
+  --map-bg: #faf9f7;
+  --map-grid: #e8e4df;
+  --map-node-bg: #ffffff;
+  --map-node-border: #d4d0cb;
+  --map-text-primary: #1a1a1a;
+  --map-text-secondary: #4a4a4a;
+  --map-text-muted: #7a7a7a;
+  --map-edge-default: #d4d0cb;
+  --map-edge-active: #b0a89e;
+}
+
+/* ==================== */
+/* Base Styles          */
+/* ==================== */
+
 *,
 *::before,
 *::after {
@@ -22,12 +128,13 @@ html {
 
 body {
   font-family: var(--font-family-sans);
-  background: #0a0a0a;
-  color: var(--color-warm);
+  background: var(--theme-bg);
+  color: var(--theme-text-primary);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
@@ -36,8 +143,8 @@ body {
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: #0a0a0a;
+  background: var(--theme-selection-bg);
+  color: var(--theme-selection-text);
 }
 
 /* Typography */
@@ -74,7 +181,7 @@ body {
 .section-divider {
   width: 60px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--color-muted), transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-text-muted), transparent);
   display: block;
 }
 
@@ -110,16 +217,16 @@ input {
 
 input:focus {
   outline: none;
-  border-color: var(--color-accent) !important;
+  border-color: var(--theme-accent) !important;
 }
 
 /* Border fix for Tailwind v4 */
 .border-subtle {
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--theme-border);
 }
 
 .border-top-subtle {
-  border-top: 1px solid #1a1a1a;
+  border-top: 1px solid var(--theme-grid);
 }
 
 /* Scrollbar - minimal */
@@ -128,16 +235,16 @@ input:focus {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: var(--theme-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: var(--theme-border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: var(--theme-border-active);
 }
 
 /* Prose styling for manifesto content */
@@ -152,7 +259,7 @@ input:focus {
 }
 
 .manifesto-section strong {
-  color: #fff;
+  color: var(--theme-text-primary);
   font-weight: 600;
 }
 
@@ -160,7 +267,7 @@ input:focus {
 .section-number {
   font-family: var(--font-family-serif);
   font-style: italic;
-  color: var(--color-muted);
+  color: var(--theme-text-muted);
 }
 
 /* Ensure flex centering works */
@@ -181,26 +288,6 @@ input:focus {
 /* ==================== */
 /* Agent Map Styles     */
 /* ==================== */
-
-/* Map color variables */
-:root {
-  --map-bg: #0a0a0a;
-  --map-grid: #1a1a1a;
-  --map-node-bg: #141414;
-  --map-node-border: #2a2a2a;
-  --map-text-primary: #e8e4df;
-  --map-text-secondary: #9a948e;
-  --map-text-muted: #6b6560;
-  --map-edge-default: #2a2a2a;
-  --map-edge-active: #4a4a4a;
-
-  /* Role colors */
-  --role-coordinator: hsl(45, 70%, 50%);
-  --role-researcher: hsl(210, 70%, 50%);
-  --role-executor: hsl(150, 70%, 50%);
-  --role-validator: hsl(280, 70%, 50%);
-  --role-synthesizer: hsl(30, 70%, 50%);
-}
 
 /* Agent node animations */
 @keyframes agentPulse {
@@ -275,25 +362,25 @@ input:focus {
 
 /* Intervention panel backdrop */
 .intervention-backdrop {
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--theme-backdrop);
   backdrop-filter: blur(4px);
 }
 
 /* Focus styles for accessibility */
 .map-control-btn:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--theme-accent);
   outline-offset: 2px;
 }
 
 /* Tooltip styles */
 .tooltip {
   position: absolute;
-  background: var(--map-node-bg);
-  border: 1px solid var(--map-node-border);
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 12px;
-  color: var(--map-text-secondary);
+  color: var(--theme-text-secondary);
   pointer-events: none;
   z-index: 1000;
   white-space: nowrap;
@@ -302,7 +389,7 @@ input:focus {
 /* Demo page specific */
 .demo-header {
   backdrop-filter: blur(10px);
-  background: rgba(10, 10, 10, 0.8);
+  background: var(--theme-backdrop);
 }
 
 /* Responsive adjustments for demo */
@@ -317,4 +404,23 @@ input:focus {
     transform: none;
     min-width: auto;
   }
+}
+
+/* ==================== */
+/* Theme Transitions    */
+/* ==================== */
+
+/* Smooth theme transitions */
+body,
+.theme-transition,
+header,
+footer,
+section,
+button,
+a,
+input {
+  transition: background-color 0.3s ease,
+              border-color 0.3s ease,
+              color 0.3s ease,
+              box-shadow 0.3s ease;
 }

@@ -10,7 +10,6 @@ import {
   AlertCircle,
   X,
 } from 'lucide-react';
-import { mapColors } from '../../utils/colorScheme';
 
 const eventIcons = {
   spawn: Sparkles,
@@ -24,13 +23,13 @@ const eventIcons = {
 };
 
 const eventColors = {
-  spawn: '#c9a87c',
+  spawn: 'var(--theme-accent)',
   complete: 'hsl(150, 70%, 50%)',
   pause: 'hsl(45, 70%, 50%)',
   resume: 'hsl(210, 70%, 50%)',
-  input: '#c9a87c',
-  activity: mapColors.textSecondary,
-  status: mapColors.textSecondary,
+  input: 'var(--theme-accent)',
+  activity: 'var(--theme-text-secondary)',
+  status: 'var(--theme-text-secondary)',
   error: 'hsl(0, 70%, 50%)',
 };
 
@@ -58,26 +57,26 @@ export default function ActivityStream({ events, onEventClick }) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: mapColors.nodeBackground,
-        borderLeft: `1px solid ${mapColors.nodeBorder}`,
+        background: 'var(--theme-surface)',
+        borderLeft: '1px solid var(--theme-border)',
       }}
     >
       {/* Header */}
       <div
         style={{
           padding: '16px',
-          borderBottom: `1px solid ${mapColors.nodeBorder}`,
+          borderBottom: '1px solid var(--theme-border)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
         }}
       >
-        <Activity size={16} style={{ color: mapColors.textMuted }} />
+        <Activity size={16} style={{ color: 'var(--theme-text-muted)' }} />
         <span
           style={{
             fontSize: '13px',
             fontWeight: 500,
-            color: mapColors.textPrimary,
+            color: 'var(--theme-text-primary)',
             letterSpacing: '0.02em',
           }}
         >
@@ -86,7 +85,7 @@ export default function ActivityStream({ events, onEventClick }) {
         <span
           style={{
             fontSize: '11px',
-            color: mapColors.textMuted,
+            color: 'var(--theme-text-muted)',
             marginLeft: 'auto',
           }}
         >
@@ -106,7 +105,7 @@ export default function ActivityStream({ events, onEventClick }) {
         <AnimatePresence>
           {events.map((event) => {
             const Icon = eventIcons[event.type] || Activity;
-            const color = eventColors[event.type] || mapColors.textSecondary;
+            const color = eventColors[event.type] || 'var(--theme-text-secondary)';
 
             return (
               <motion.div
@@ -118,13 +117,13 @@ export default function ActivityStream({ events, onEventClick }) {
                 onClick={() => onEventClick?.(event.agentId)}
                 style={{
                   padding: '12px 16px',
-                  borderBottom: `1px solid ${mapColors.nodeBorder}`,
+                  borderBottom: '1px solid var(--theme-border)',
                   cursor: event.agentId ? 'pointer' : 'default',
                   transition: 'background 0.2s',
                 }}
                 onMouseEnter={(e) => {
                   if (event.agentId) {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                    e.currentTarget.style.background = 'var(--theme-surface-elevated)';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -159,7 +158,7 @@ export default function ActivityStream({ events, onEventClick }) {
                     <div
                       style={{
                         fontSize: '12px',
-                        color: mapColors.textPrimary,
+                        color: 'var(--theme-text-primary)',
                         marginBottom: '2px',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -172,14 +171,14 @@ export default function ActivityStream({ events, onEventClick }) {
                         </span>
                       )}
                       {event.agentName && ' — '}
-                      <span style={{ color: mapColors.textSecondary }}>
+                      <span style={{ color: 'var(--theme-text-secondary)' }}>
                         {event.message}
                       </span>
                     </div>
                     <div
                       style={{
                         fontSize: '10px',
-                        color: mapColors.textMuted,
+                        color: 'var(--theme-text-muted)',
                       }}
                     >
                       {formatTime(event.timestamp)}
@@ -196,7 +195,7 @@ export default function ActivityStream({ events, onEventClick }) {
             style={{
               padding: '32px 16px',
               textAlign: 'center',
-              color: mapColors.textMuted,
+              color: 'var(--theme-text-muted)',
               fontSize: '13px',
             }}
           >

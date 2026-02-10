@@ -5,7 +5,6 @@ import AgentNode from './AgentNode';
 import AgentEdge from './AgentEdge';
 import MapControls from './MapControls';
 import { calculateLayout, calculateBounds } from '../../utils/layoutEngine';
-import { mapColors } from '../../utils/colorScheme';
 
 export default function AgentMap({
   agents,
@@ -113,7 +112,7 @@ export default function AgentMap({
       style={{
         width: '100%',
         height: '100%',
-        background: mapColors.background,
+        background: 'var(--theme-bg)',
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -138,7 +137,7 @@ export default function AgentMap({
             <path
               d="M 40 0 L 0 0 0 40"
               fill="none"
-              stroke={mapColors.gridLine}
+              stroke="var(--theme-grid)"
               strokeWidth="0.5"
             />
           </pattern>
@@ -209,7 +208,7 @@ export default function AgentMap({
             left: '50%',
             transform: 'translate(-50%, -50%)',
             textAlign: 'center',
-            color: mapColors.textMuted,
+            color: 'var(--theme-text-muted)',
           }}
         >
           <p style={{ fontSize: '18px', marginBottom: '8px' }}>No agents running</p>

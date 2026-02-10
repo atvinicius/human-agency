@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Pause, Play, Eye, X, RotateCcw } from 'lucide-react';
-import { mapColors, getAgentColor } from '../../utils/colorScheme';
+import { getAgentColor } from '../../utils/colorScheme';
 
 export default function QuickActions({
   agent,
@@ -23,9 +23,9 @@ export default function QuickActions({
     gap: '8px',
     padding: '10px 16px',
     background: 'transparent',
-    border: `1px solid ${mapColors.nodeBorder}`,
+    border: '1px solid var(--theme-border)',
     borderRadius: '6px',
-    color: mapColors.textSecondary,
+    color: 'var(--theme-text-secondary)',
     fontSize: '13px',
     cursor: 'pointer',
     transition: 'all 0.2s',
@@ -46,12 +46,12 @@ export default function QuickActions({
           onClick={() => onPause(agent.id)}
           style={buttonStyle}
           onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#c9a87c';
-            e.currentTarget.style.color = '#c9a87c';
+            e.currentTarget.style.borderColor = 'var(--theme-accent)';
+            e.currentTarget.style.color = 'var(--theme-accent)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = mapColors.nodeBorder;
-            e.currentTarget.style.color = mapColors.textSecondary;
+            e.currentTarget.style.borderColor = 'var(--theme-border)';
+            e.currentTarget.style.color = 'var(--theme-text-secondary)';
           }}
         >
           <Pause size={14} />
@@ -68,8 +68,8 @@ export default function QuickActions({
             e.currentTarget.style.color = 'hsl(150, 70%, 50%)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = mapColors.nodeBorder;
-            e.currentTarget.style.color = mapColors.textSecondary;
+            e.currentTarget.style.borderColor = 'var(--theme-border)';
+            e.currentTarget.style.color = 'var(--theme-text-secondary)';
           }}
         >
           <Play size={14} />
@@ -85,8 +85,8 @@ export default function QuickActions({
           e.currentTarget.style.color = color;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = mapColors.nodeBorder;
-          e.currentTarget.style.color = mapColors.textSecondary;
+          e.currentTarget.style.borderColor = 'var(--theme-border)';
+          e.currentTarget.style.color = 'var(--theme-text-secondary)';
         }}
       >
         <Eye size={14} />
@@ -102,8 +102,8 @@ export default function QuickActions({
             e.currentTarget.style.color = 'hsl(210, 70%, 50%)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = mapColors.nodeBorder;
-            e.currentTarget.style.color = mapColors.textSecondary;
+            e.currentTarget.style.borderColor = 'var(--theme-border)';
+            e.currentTarget.style.color = 'var(--theme-text-secondary)';
           }}
         >
           <RotateCcw size={14} />
@@ -120,8 +120,8 @@ export default function QuickActions({
             e.currentTarget.style.color = 'hsl(0, 70%, 50%)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = mapColors.nodeBorder;
-            e.currentTarget.style.color = mapColors.textSecondary;
+            e.currentTarget.style.borderColor = 'var(--theme-border)';
+            e.currentTarget.style.color = 'var(--theme-text-secondary)';
           }}
         >
           <X size={14} />

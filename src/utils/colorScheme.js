@@ -57,8 +57,24 @@ export function getAgentScale(priority) {
   return priorityStyles[priority]?.scale ?? 1;
 }
 
-// CSS variables for theming
+// Theme-aware colors - use CSS variables for theming
 export const mapColors = {
+  // These will be overridden by CSS variables when accessed via getThemeColors()
+  background: 'var(--theme-bg)',
+  gridLine: 'var(--theme-grid)',
+  nodeBackground: 'var(--theme-surface)',
+  nodeBorder: 'var(--theme-border)',
+  textPrimary: 'var(--theme-text-primary)',
+  textSecondary: 'var(--theme-text-secondary)',
+  textMuted: 'var(--theme-text-muted)',
+  edgeDefault: 'var(--theme-border)',
+  edgeActive: 'var(--theme-border-active)',
+  accent: 'var(--theme-accent)',
+  accentText: 'var(--theme-accent-text)',
+};
+
+// Static color values for components that can't use CSS variables directly
+export const darkColors = {
   background: '#0a0a0a',
   gridLine: '#1a1a1a',
   nodeBackground: '#141414',
@@ -68,4 +84,25 @@ export const mapColors = {
   textMuted: '#6b6560',
   edgeDefault: '#2a2a2a',
   edgeActive: '#4a4a4a',
+  accent: '#c9a87c',
+  accentText: '#0a0a0a',
 };
+
+export const lightColors = {
+  background: '#faf9f7',
+  gridLine: '#e8e4df',
+  nodeBackground: '#ffffff',
+  nodeBorder: '#d4d0cb',
+  textPrimary: '#1a1a1a',
+  textSecondary: '#4a4a4a',
+  textMuted: '#7a7a7a',
+  edgeDefault: '#d4d0cb',
+  edgeActive: '#b0a89e',
+  accent: '#8b6f47',
+  accentText: '#ffffff',
+};
+
+// Helper to get current theme colors (for JS that needs static values)
+export function getThemeColors(theme) {
+  return theme === 'light' ? lightColors : darkColors;
+}

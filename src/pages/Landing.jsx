@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Check, Play } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -20,7 +21,7 @@ function Header() {
   return (
     <header style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, padding: '1.5rem' }}>
       <div style={{ maxWidth: '56rem', marginLeft: 'auto', marginRight: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <a href="/" className="font-serif" style={{ fontSize: '1.25rem', letterSpacing: '-0.025em', color: '#e8e4df', textDecoration: 'none' }}>
+        <a href="/" className="font-serif" style={{ fontSize: '1.25rem', letterSpacing: '-0.025em', color: 'var(--theme-text-primary)', textDecoration: 'none' }}>
           Human Agency
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -31,12 +32,12 @@ function Header() {
               alignItems: 'center',
               gap: '0.5rem',
               fontSize: '0.875rem',
-              color: '#c9a87c',
+              color: 'var(--theme-accent)',
               textDecoration: 'none',
               transition: 'color 0.3s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#e8e4df'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#c9a87c'}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--theme-accent)'}
           >
             <Play size={14} />
             Try Demo
@@ -44,12 +45,13 @@ function Header() {
           <a
             href="#waitlist"
             className="btn-minimal"
-            style={{ fontSize: '0.875rem', color: '#6b6560', textDecoration: 'none', transition: 'color 0.3s' }}
-            onMouseEnter={(e) => e.target.style.color = '#e8e4df'}
-            onMouseLeave={(e) => e.target.style.color = '#6b6560'}
+            style={{ fontSize: '0.875rem', color: 'var(--theme-text-muted)', textDecoration: 'none', transition: 'color 0.3s' }}
+            onMouseEnter={(e) => e.target.style.color = 'var(--theme-text-primary)'}
+            onMouseLeave={(e) => e.target.style.color = 'var(--theme-text-muted)'}
           >
             Join Waitlist
           </a>
+          <ThemeToggle size="small" />
         </div>
       </div>
     </header>
@@ -67,7 +69,7 @@ function Hero() {
       >
         <motion.p
           variants={fadeUp}
-          style={{ color: '#6b6560', fontSize: '0.875rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2rem' }}
+          style={{ color: 'var(--theme-text-muted)', fontSize: '0.875rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2rem' }}
         >
           A Manifesto
         </motion.p>
@@ -75,7 +77,7 @@ function Hero() {
         <motion.h1
           variants={fadeUp}
           className="font-serif"
-          style={{ fontSize: 'clamp(2rem, 8vw, 4.5rem)', fontWeight: 500, lineHeight: 1.1, marginBottom: '2rem', letterSpacing: '-0.025em', color: '#e8e4df' }}
+          style={{ fontSize: 'clamp(2rem, 8vw, 4.5rem)', fontWeight: 500, lineHeight: 1.1, marginBottom: '2rem', letterSpacing: '-0.025em', color: 'var(--theme-text-primary)' }}
         >
           The Economic Case for the Infinite Individual
         </motion.h1>
@@ -88,7 +90,7 @@ function Hero() {
 
         <motion.p
           variants={fadeUp}
-          style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', color: '#9a948e', lineHeight: 1.7, maxWidth: '42rem', marginLeft: 'auto', marginRight: 'auto' }}
+          style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', color: 'var(--theme-text-secondary)', lineHeight: 1.7, maxWidth: '42rem', marginLeft: 'auto', marginRight: 'auto' }}
         >
           We are witnessing the most violent economic shift in history: the marginal cost of cognitive execution is collapsing to zero.
         </motion.p>
@@ -104,8 +106,8 @@ function Hero() {
               alignItems: 'center',
               gap: '0.75rem',
               padding: '1rem 2rem',
-              background: '#c9a87c',
-              color: '#0a0a0a',
+              background: 'var(--theme-accent)',
+              color: 'var(--theme-accent-text)',
               textDecoration: 'none',
               fontWeight: 500,
               fontSize: '1rem',
@@ -113,11 +115,11 @@ function Hero() {
               borderRadius: '2px'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#e8e4df';
+              e.currentTarget.style.background = 'var(--theme-accent-hover)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#c9a87c';
+              e.currentTarget.style.background = 'var(--theme-accent)';
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
@@ -126,9 +128,9 @@ function Hero() {
           </Link>
           <a
             href="#manifesto"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#6b6560', fontSize: '0.875rem', textDecoration: 'none', transition: 'color 0.3s' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#e8e4df'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#6b6560'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--theme-text-muted)', fontSize: '0.875rem', textDecoration: 'none', transition: 'color 0.3s' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--theme-text-muted)'}
           >
             <span>Read the Manifesto</span>
             <ArrowRight style={{ width: '1rem', height: '1rem' }} />
@@ -153,10 +155,10 @@ function ManifestoSection({ number, title, children, id }) {
     >
       <div style={{ maxWidth: '42rem', marginLeft: 'auto', marginRight: 'auto', width: '100%' }}>
         <span className="section-number" style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'block' }}>{number}</span>
-        <h2 className="font-serif" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: 500, marginBottom: '2rem', letterSpacing: '-0.025em', color: 'white' }}>
+        <h2 className="font-serif" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: 500, marginBottom: '2rem', letterSpacing: '-0.025em', color: 'var(--theme-text-primary)' }}>
           {title}
         </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', color: '#9a948e', fontSize: '1.125rem', lineHeight: 1.8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', color: 'var(--theme-text-secondary)', fontSize: '1.125rem', lineHeight: 1.8 }}>
           {children}
         </div>
       </div>
@@ -192,7 +194,7 @@ function Manifesto() {
         <p>
           Today, if a human tries to manage 100 AI agents, they drown in noise. We lack the orchestration layer to wield the power we have created.
         </p>
-        <p style={{ color: 'white' }}>
+        <p style={{ color: 'var(--theme-text-primary)' }}>
           Without this layer, human value collapses. With it, human value becomes infinite.
         </p>
       </ManifestoSection>
@@ -205,14 +207,14 @@ function Manifesto() {
           In this new economy, the human does not compete with the machine on execution—writing code, analyzing data, generating pixels. The human monopolizes <strong>Intent</strong> and <strong>Judgment</strong>.
         </p>
         <div style={{ padding: '1.5rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <p style={{ color: 'white' }}>
-            <span style={{ color: '#c9a87c' }}>AI solves.</span> Humans define <em>what</em> to solve.
+          <p style={{ color: 'var(--theme-text-primary)' }}>
+            <span style={{ color: 'var(--theme-accent)' }}>AI solves.</span> Humans define <em>what</em> to solve.
           </p>
-          <p style={{ color: 'white' }}>
-            <span style={{ color: '#c9a87c' }}>AI explores.</span> Humans define the <em>boundary</em>.
+          <p style={{ color: 'var(--theme-text-primary)' }}>
+            <span style={{ color: 'var(--theme-accent)' }}>AI explores.</span> Humans define the <em>boundary</em>.
           </p>
-          <p style={{ color: 'white' }}>
-            <span style={{ color: '#c9a87c' }}>AI generates.</span> Humans provide the <em>sanction</em>.
+          <p style={{ color: 'var(--theme-text-primary)' }}>
+            <span style={{ color: 'var(--theme-accent)' }}>AI generates.</span> Humans provide the <em>sanction</em>.
           </p>
         </div>
         <p>
@@ -230,7 +232,7 @@ function Manifesto() {
         <p>
           We are building the infrastructure that validates, aggregates, and directs AI labor, ensuring that as the leverage of the machine approaches infinity, the agency of the human remains absolute.
         </p>
-        <p className="font-serif" style={{ color: 'white', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', paddingTop: '2rem', fontStyle: 'italic' }}>
+        <p className="font-serif" style={{ color: 'var(--theme-text-primary)', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', paddingTop: '2rem', fontStyle: 'italic' }}>
           We do not save labor. We transcend it.
         </p>
       </ManifestoSection>
@@ -263,10 +265,10 @@ function Waitlist() {
         {!submitted ? (
           <>
             <span className="section-number" style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'block' }}>V.</span>
-            <h2 className="font-serif" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: 500, marginBottom: '1.5rem', letterSpacing: '-0.025em', color: 'white' }}>
+            <h2 className="font-serif" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: 500, marginBottom: '1.5rem', letterSpacing: '-0.025em', color: 'var(--theme-text-primary)' }}>
               Join the Movement
             </h2>
-            <p style={{ color: '#9a948e', fontSize: '1.125rem', marginBottom: '2.5rem' }}>
+            <p style={{ color: 'var(--theme-text-secondary)', fontSize: '1.125rem', marginBottom: '2.5rem' }}>
               Be among the first to become a Sovereign Operator.
             </p>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -280,8 +282,8 @@ function Waitlist() {
                   width: '100%',
                   padding: '1rem 1.5rem',
                   backgroundColor: 'transparent',
-                  border: '1px solid #2a2a2a',
-                  color: '#e8e4df',
+                  border: '1px solid var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
                   textAlign: 'center',
                   fontSize: '1.125rem',
                   transition: 'border-color 0.3s'
@@ -292,8 +294,8 @@ function Waitlist() {
                 style={{
                   width: '100%',
                   padding: '1rem 1.5rem',
-                  backgroundColor: '#e8e4df',
-                  color: '#0a0a0a',
+                  backgroundColor: 'var(--theme-text-primary)',
+                  color: 'var(--theme-bg)',
                   fontWeight: 500,
                   fontSize: '1.125rem',
                   border: 'none',
@@ -302,10 +304,10 @@ function Waitlist() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
-                  transition: 'background-color 0.3s'
+                  transition: 'opacity 0.3s'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'white'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#e8e4df'}
+                onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.target.style.opacity = '1'}
               >
                 <span>Request Access</span>
                 <ArrowRight style={{ width: '1.25rem', height: '1.25rem' }} />
@@ -325,15 +327,15 @@ function Waitlist() {
               marginRight: 'auto',
               marginBottom: '1.5rem',
               borderRadius: '50%',
-              border: '1px solid #c9a87c',
+              border: '1px solid var(--theme-accent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Check style={{ width: '2rem', height: '2rem', color: '#c9a87c' }} />
+              <Check style={{ width: '2rem', height: '2rem', color: 'var(--theme-accent)' }} />
             </div>
-            <h2 className="font-serif" style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>You're on the list</h2>
-            <p style={{ color: '#6b6560' }}>
+            <h2 className="font-serif" style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--theme-text-primary)' }}>You're on the list</h2>
+            <p style={{ color: 'var(--theme-text-muted)' }}>
               We'll be in touch.
             </p>
           </motion.div>
@@ -345,7 +347,7 @@ function Waitlist() {
 
 function Footer() {
   return (
-    <footer style={{ padding: '4rem 1.5rem', borderTop: '1px solid #1a1a1a' }}>
+    <footer style={{ padding: '4rem 1.5rem', borderTop: '1px solid var(--theme-grid)' }}>
       <div style={{
         maxWidth: '56rem',
         marginLeft: 'auto',
@@ -356,11 +358,11 @@ function Footer() {
         justifyContent: 'space-between',
         gap: '1.5rem'
       }}>
-        <span className="font-serif" style={{ fontSize: '1.125rem' }}>Human Agency</span>
-        <p style={{ color: '#4a4a4a', fontSize: '0.875rem' }}>
+        <span className="font-serif" style={{ fontSize: '1.125rem', color: 'var(--theme-text-primary)' }}>Human Agency</span>
+        <p style={{ color: 'var(--theme-text-muted)', fontSize: '0.875rem' }}>
           We do not save labor. We transcend it.
         </p>
-        <span style={{ color: '#4a4a4a', fontSize: '0.875rem' }}>
+        <span style={{ color: 'var(--theme-text-muted)', fontSize: '0.875rem' }}>
           2026
         </span>
       </div>

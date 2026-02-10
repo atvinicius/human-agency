@@ -1,5 +1,4 @@
-import { ZoomIn, ZoomOut, Maximize, Pause, Play, RotateCcw, Filter } from 'lucide-react';
-import { mapColors } from '../../utils/colorScheme';
+import { ZoomIn, ZoomOut, Maximize, Pause, Play, RotateCcw } from 'lucide-react';
 
 export default function MapControls({
   onZoomIn,
@@ -11,12 +10,12 @@ export default function MapControls({
   stats,
 }) {
   const buttonStyle = {
-    background: mapColors.nodeBackground,
-    border: `1px solid ${mapColors.nodeBorder}`,
+    background: 'var(--theme-surface)',
+    border: '1px solid var(--theme-border)',
     borderRadius: '6px',
     padding: '8px',
     cursor: 'pointer',
-    color: mapColors.textSecondary,
+    color: 'var(--theme-text-secondary)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -24,13 +23,13 @@ export default function MapControls({
   };
 
   const handleMouseEnter = (e) => {
-    e.currentTarget.style.borderColor = mapColors.textMuted;
-    e.currentTarget.style.color = mapColors.textPrimary;
+    e.currentTarget.style.borderColor = 'var(--theme-text-muted)';
+    e.currentTarget.style.color = 'var(--theme-text-primary)';
   };
 
   const handleMouseLeave = (e) => {
-    e.currentTarget.style.borderColor = mapColors.nodeBorder;
-    e.currentTarget.style.color = mapColors.textSecondary;
+    e.currentTarget.style.borderColor = 'var(--theme-border)';
+    e.currentTarget.style.color = 'var(--theme-text-secondary)';
   };
 
   return (
@@ -49,8 +48,8 @@ export default function MapControls({
         style={{
           display: 'flex',
           gap: '4px',
-          background: mapColors.nodeBackground,
-          border: `1px solid ${mapColors.nodeBorder}`,
+          background: 'var(--theme-surface)',
+          border: '1px solid var(--theme-border)',
           borderRadius: '8px',
           padding: '4px',
         }}
@@ -89,8 +88,8 @@ export default function MapControls({
         style={{
           display: 'flex',
           gap: '4px',
-          background: mapColors.nodeBackground,
-          border: `1px solid ${mapColors.nodeBorder}`,
+          background: 'var(--theme-surface)',
+          border: '1px solid var(--theme-border)',
           borderRadius: '8px',
           padding: '4px',
         }}
@@ -99,9 +98,9 @@ export default function MapControls({
           onClick={onTogglePause}
           style={{
             ...buttonStyle,
-            background: isPaused ? 'rgba(201, 168, 124, 0.1)' : buttonStyle.background,
-            borderColor: isPaused ? '#c9a87c' : buttonStyle.borderColor,
-            color: isPaused ? '#c9a87c' : buttonStyle.color,
+            background: isPaused ? 'var(--theme-accent-muted)' : buttonStyle.background,
+            borderColor: isPaused ? 'var(--theme-accent)' : buttonStyle.borderColor,
+            color: isPaused ? 'var(--theme-accent)' : buttonStyle.color,
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -127,8 +126,8 @@ export default function MapControls({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: mapColors.nodeBackground,
-            border: `1px solid ${mapColors.nodeBorder}`,
+            background: 'var(--theme-surface)',
+            border: '1px solid var(--theme-border)',
             borderRadius: '8px',
             padding: '8px 12px',
             fontSize: '12px',
@@ -136,19 +135,19 @@ export default function MapControls({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'hsl(150, 70%, 50%)' }} />
-            <span style={{ color: mapColors.textSecondary }}>{stats.working}</span>
+            <span style={{ color: 'var(--theme-text-secondary)' }}>{stats.working}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'hsl(45, 70%, 50%)' }} />
-            <span style={{ color: mapColors.textSecondary }}>{stats.waiting}</span>
+            <span style={{ color: 'var(--theme-text-secondary)' }}>{stats.waiting}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'hsl(0, 20%, 35%)' }} />
-            <span style={{ color: mapColors.textSecondary }}>{stats.completed}</span>
+            <span style={{ color: 'var(--theme-text-secondary)' }}>{stats.completed}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ color: mapColors.textMuted }}>Total:</span>
-            <span style={{ color: mapColors.textPrimary }}>{stats.total}</span>
+            <span style={{ color: 'var(--theme-text-muted)' }}>Total:</span>
+            <span style={{ color: 'var(--theme-text-primary)' }}>{stats.total}</span>
           </div>
         </div>
       )}

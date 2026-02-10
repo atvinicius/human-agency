@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, MessageSquare, AlertCircle } from 'lucide-react';
-import { mapColors, getAgentColor } from '../../utils/colorScheme';
+import { getAgentColor } from '../../utils/colorScheme';
 
 export default function InterventionPanel({
   agent,
@@ -41,19 +41,19 @@ export default function InterventionPanel({
           bottom: 0,
           width: '400px',
           maxWidth: '100vw',
-          background: mapColors.nodeBackground,
-          borderLeft: `1px solid ${mapColors.nodeBorder}`,
+          background: 'var(--theme-surface)',
+          borderLeft: '1px solid var(--theme-border)',
           display: 'flex',
           flexDirection: 'column',
           zIndex: 200,
-          boxShadow: '-10px 0 30px rgba(0,0,0,0.3)',
+          boxShadow: 'var(--theme-shadow)',
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: '20px',
-            borderBottom: `1px solid ${mapColors.nodeBorder}`,
+            borderBottom: '1px solid var(--theme-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -75,10 +75,10 @@ export default function InterventionPanel({
               <AlertCircle size={20} style={{ color }} />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 500, color: mapColors.textPrimary }}>
+              <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--theme-text-primary)' }}>
                 Human Input Required
               </div>
-              <div style={{ fontSize: '12px', color: mapColors.textMuted }}>
+              <div style={{ fontSize: '12px', color: 'var(--theme-text-muted)' }}>
                 {agent.name}
               </div>
             </div>
@@ -90,7 +90,7 @@ export default function InterventionPanel({
               border: 'none',
               padding: '8px',
               cursor: 'pointer',
-              color: mapColors.textMuted,
+              color: 'var(--theme-text-muted)',
               borderRadius: '6px',
             }}
           >
@@ -105,7 +105,7 @@ export default function InterventionPanel({
             style={{
               fontSize: '18px',
               fontWeight: 500,
-              color: mapColors.textPrimary,
+              color: 'var(--theme-text-primary)',
               marginBottom: '12px',
             }}
           >
@@ -116,7 +116,7 @@ export default function InterventionPanel({
           <p
             style={{
               fontSize: '14px',
-              color: mapColors.textSecondary,
+              color: 'var(--theme-text-secondary)',
               lineHeight: 1.6,
               marginBottom: '24px',
             }}
@@ -134,9 +134,9 @@ export default function InterventionPanel({
                   style={{
                     padding: '14px 20px',
                     background: 'transparent',
-                    border: `1px solid ${mapColors.nodeBorder}`,
+                    border: '1px solid var(--theme-border)',
                     borderRadius: '8px',
-                    color: mapColors.textPrimary,
+                    color: 'var(--theme-text-primary)',
                     fontSize: '14px',
                     cursor: 'pointer',
                     textAlign: 'left',
@@ -150,12 +150,12 @@ export default function InterventionPanel({
                     e.currentTarget.style.background = `${color}10`;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = mapColors.nodeBorder;
+                    e.currentTarget.style.borderColor = 'var(--theme-border)';
                     e.currentTarget.style.background = 'transparent';
                   }}
                 >
                   <span>{option}</span>
-                  <Check size={16} style={{ color: mapColors.textMuted }} />
+                  <Check size={16} style={{ color: 'var(--theme-text-muted)' }} />
                 </button>
               ))}
             </div>
@@ -173,9 +173,9 @@ export default function InterventionPanel({
                   height: '120px',
                   padding: '14px',
                   background: 'transparent',
-                  border: `1px solid ${mapColors.nodeBorder}`,
+                  border: '1px solid var(--theme-border)',
                   borderRadius: '8px',
-                  color: mapColors.textPrimary,
+                  color: 'var(--theme-text-primary)',
                   fontSize: '14px',
                   resize: 'none',
                   marginBottom: '16px',
@@ -187,10 +187,10 @@ export default function InterventionPanel({
                 style={{
                   width: '100%',
                   padding: '14px',
-                  background: textInput.trim() ? color : mapColors.nodeBorder,
+                  background: textInput.trim() ? color : 'var(--theme-border)',
                   border: 'none',
                   borderRadius: '8px',
-                  color: textInput.trim() ? '#0a0a0a' : mapColors.textMuted,
+                  color: textInput.trim() ? 'var(--theme-text-inverted)' : 'var(--theme-text-muted)',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: textInput.trim() ? 'pointer' : 'not-allowed',
@@ -212,22 +212,22 @@ export default function InterventionPanel({
         <div
           style={{
             padding: '16px 20px',
-            borderTop: `1px solid ${mapColors.nodeBorder}`,
-            background: 'rgba(0,0,0,0.2)',
+            borderTop: '1px solid var(--theme-border)',
+            background: 'var(--theme-surface-elevated)',
           }}
         >
-          <div style={{ fontSize: '11px', color: mapColors.textMuted, marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--theme-text-muted)', marginBottom: '8px' }}>
             Agent Context
           </div>
-          <div style={{ fontSize: '13px', color: mapColors.textSecondary }}>
-            <strong style={{ color: mapColors.textPrimary }}>{agent.name}</strong>
+          <div style={{ fontSize: '13px', color: 'var(--theme-text-secondary)' }}>
+            <strong style={{ color: 'var(--theme-text-primary)' }}>{agent.name}</strong>
             {' — '}
             {agent.objective}
           </div>
           <div
             style={{
               fontSize: '12px',
-              color: mapColors.textMuted,
+              color: 'var(--theme-text-muted)',
               marginTop: '8px',
             }}
           >

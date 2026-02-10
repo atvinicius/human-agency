@@ -6,7 +6,6 @@ import {
   getAgentOpacity,
   getAgentBorderWidth,
   getAgentScale,
-  mapColors,
 } from '../../utils/colorScheme';
 
 const statusIcons = {
@@ -65,8 +64,8 @@ export default function AgentNode({
         top: agent.y,
         width: agent.width || 280,
         height: agent.height || 120,
-        background: mapColors.nodeBackground,
-        border: `${borderWidth}px solid ${isSelected ? color : mapColors.nodeBorder}`,
+        background: 'var(--theme-surface)',
+        border: `${borderWidth}px solid ${isSelected ? color : 'var(--theme-border)'}`,
         borderRadius: '8px',
         boxShadow: isSelected ? glow : 'none',
         cursor: 'pointer',
@@ -83,7 +82,7 @@ export default function AgentNode({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 12px',
-          borderBottom: `1px solid ${mapColors.nodeBorder}`,
+          borderBottom: '1px solid var(--theme-border)',
           background: `linear-gradient(90deg, ${color}15, transparent)`,
         }}
       >
@@ -103,7 +102,7 @@ export default function AgentNode({
               fontSize: '11px',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              color: mapColors.textMuted,
+              color: 'var(--theme-text-muted)',
             }}
           >
             {role}
@@ -111,7 +110,7 @@ export default function AgentNode({
           {StatusIcon && (
             <StatusIcon
               size={12}
-              style={{ color: mapColors.textMuted }}
+              style={{ color: 'var(--theme-text-muted)' }}
             />
           )}
         </div>
@@ -129,13 +128,13 @@ export default function AgentNode({
                 border: 'none',
                 padding: '4px',
                 cursor: 'pointer',
-                color: mapColors.textMuted,
+                color: 'var(--theme-text-muted)',
                 borderRadius: '4px',
                 display: 'flex',
                 alignItems: 'center',
               }}
-              onMouseEnter={(e) => (e.target.style.color = mapColors.textPrimary)}
-              onMouseLeave={(e) => (e.target.style.color = mapColors.textMuted)}
+              onMouseEnter={(e) => (e.target.style.color = 'var(--theme-text-primary)')}
+              onMouseLeave={(e) => (e.target.style.color = 'var(--theme-text-muted)')}
               title="Pause"
             >
               <Pause size={12} />
@@ -149,13 +148,13 @@ export default function AgentNode({
                 border: 'none',
                 padding: '4px',
                 cursor: 'pointer',
-                color: mapColors.textMuted,
+                color: 'var(--theme-text-muted)',
                 borderRadius: '4px',
                 display: 'flex',
                 alignItems: 'center',
               }}
-              onMouseEnter={(e) => (e.target.style.color = mapColors.textPrimary)}
-              onMouseLeave={(e) => (e.target.style.color = mapColors.textMuted)}
+              onMouseEnter={(e) => (e.target.style.color = 'var(--theme-text-primary)')}
+              onMouseLeave={(e) => (e.target.style.color = 'var(--theme-text-muted)')}
               title="Resume"
             >
               <Play size={12} />
@@ -168,13 +167,13 @@ export default function AgentNode({
               border: 'none',
               padding: '4px',
               cursor: 'pointer',
-              color: mapColors.textMuted,
+              color: 'var(--theme-text-muted)',
               borderRadius: '4px',
               display: 'flex',
               alignItems: 'center',
             }}
-            onMouseEnter={(e) => (e.target.style.color = mapColors.textPrimary)}
-            onMouseLeave={(e) => (e.target.style.color = mapColors.textMuted)}
+            onMouseEnter={(e) => (e.target.style.color = 'var(--theme-text-primary)')}
+            onMouseLeave={(e) => (e.target.style.color = 'var(--theme-text-muted)')}
             title="Dive In"
           >
             <Eye size={12} />
@@ -189,7 +188,7 @@ export default function AgentNode({
           style={{
             fontSize: '14px',
             fontWeight: 500,
-            color: mapColors.textPrimary,
+            color: 'var(--theme-text-primary)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -202,7 +201,7 @@ export default function AgentNode({
         <div
           style={{
             height: '4px',
-            background: mapColors.nodeBorder,
+            background: 'var(--theme-border)',
             borderRadius: '2px',
             overflow: 'hidden',
           }}
@@ -223,14 +222,14 @@ export default function AgentNode({
         <div
           style={{
             fontSize: '11px',
-            color: mapColors.textSecondary,
+            color: 'var(--theme-text-secondary)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}
         >
           {pendingInput ? (
-            <span style={{ color: '#c9a87c' }}>
+            <span style={{ color: 'var(--theme-accent)' }}>
               Awaiting input...
             </span>
           ) : (
@@ -248,7 +247,7 @@ export default function AgentNode({
             right: '-8px',
             width: '20px',
             height: '20px',
-            background: '#c9a87c',
+            background: 'var(--theme-accent)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
@@ -256,7 +255,7 @@ export default function AgentNode({
             animation: 'pulse 1.5s infinite',
           }}
         >
-          <AlertCircle size={12} color="#0a0a0a" />
+          <AlertCircle size={12} color="var(--theme-accent-text)" />
         </div>
       )}
 

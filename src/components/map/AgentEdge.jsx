@@ -1,5 +1,3 @@
-import { mapColors } from '../../utils/colorScheme';
-
 export default function AgentEdge({ edge, isHighlighted }) {
   const { sourceX, sourceY, targetX, targetY } = edge;
 
@@ -18,7 +16,7 @@ export default function AgentEdge({ edge, isHighlighted }) {
         <path
           d={pathData}
           fill="none"
-          stroke={mapColors.edgeActive}
+          stroke="var(--theme-border-active)"
           strokeWidth={4}
           strokeOpacity={0.3}
         />
@@ -27,7 +25,7 @@ export default function AgentEdge({ edge, isHighlighted }) {
       <path
         d={pathData}
         fill="none"
-        stroke={isHighlighted ? mapColors.edgeActive : mapColors.edgeDefault}
+        stroke={isHighlighted ? 'var(--theme-border-active)' : 'var(--theme-border)'}
         strokeWidth={isHighlighted ? 2 : 1}
         strokeDasharray={isHighlighted ? 'none' : 'none'}
       />
@@ -36,7 +34,7 @@ export default function AgentEdge({ edge, isHighlighted }) {
         cx={targetX}
         cy={targetY}
         r={3}
-        fill={isHighlighted ? mapColors.edgeActive : mapColors.edgeDefault}
+        fill={isHighlighted ? 'var(--theme-border-active)' : 'var(--theme-border)'}
       />
     </g>
   );
