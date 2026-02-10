@@ -150,6 +150,56 @@ export class MockAgentSimulator {
     this.startInputRequests();
   }
 
+  // Start with a preset configuration
+  startWithPreset(preset) {
+    if (this.running) return;
+    this.running = true;
+
+    // Spawn agents from preset config
+    if (preset.agent_config?.root) {
+      this.spawnFromConfig(preset.agent_config.root, null, preset.initial_objective);
+    }
+
+    // Start simulation loops
+    this.startAgentProgress();
+    this.startSpawning();
+    this.startInputRequests();
+  }
+
+  // Recursively spawn agents from config
+  spawnFromConfig(config, parentId = null, fallbackObjective = '') {
+    const agent = createAgent({
+      parentId,
+      role: config.role,
+      name: config.name,
+      objective: config.objective || fallbackObjective,
+      priority: config.priority || (parentId ? 'normal' : 'critical'),
+    });
+
+    this.store.addAgent(agent);
+
+    // Spawn children with delay for visual effect
+    if (config.children && config.children.length > 0) {
+      config.children.forEach((childConfig, index) => {
+        setTimeout(() => {
+          if (this.running) {
+            const childAgent = this.spawnFromConfig(
+              childConfig,
+              agent.id,
+              childConfig.objective || config.objective || fallbackObjective
+            );
+            // Update parent's childIds
+            this.store.updateAgent(agent.id, {
+              childIds: [...(this.store.getAgentById?.(agent.id)?.childIds || []), childAgent.id],
+            });
+          }
+        }, 800 + index * 400 + Math.random() * 300);
+      });
+    }
+
+    return agent;
+  }
+
   stop() {
     this.running = false;
     this.intervals.forEach((interval) => clearInterval(interval));
