@@ -22,10 +22,11 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
 
-  // Redirect if already logged in
+  // Redirect if already logged in (and verified)
   useEffect(() => {
-    if (user) navigate(from, { replace: true });
+    if (user && user.email_confirmed_at) navigate(from, { replace: true });
   }, [user, navigate, from]);
 
   const handlePasswordSubmit = async (e) => {
@@ -40,7 +41,11 @@ export default function Login() {
 
     setLoading(false);
     if (!result.error) {
-      navigate(from, { replace: true });
+      if (result.needsConfirmation) {
+        setConfirmationPending(true);
+      } else {
+        navigate(from, { replace: true });
+      }
     }
   };
 
@@ -120,7 +125,43 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Method toggle */}
+        {/* Email confirmation pending */}
+        {confirmationPending && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{ textAlign: 'center', padding: '16px 0' }}
+          >
+            <CheckCircle
+              size={48}
+              style={{ color: 'var(--theme-accent)', marginBottom: '16px' }}
+            />
+            <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--theme-text-primary)', marginBottom: '8px' }}>
+              Confirm your email
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--theme-text-secondary)', marginBottom: '20px' }}>
+              We sent a confirmation link to <strong style={{ color: 'var(--theme-text-primary)' }}>{email}</strong>
+            </p>
+            <button
+              onClick={() => {
+                setConfirmationPending(false);
+                setMode('signin');
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--theme-accent)',
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
+              Back to Sign In
+            </button>
+          </motion.div>
+        )}
+
+        {/* Method toggle + forms (hidden when confirmation pending) */}
+        {!confirmationPending && (<>
         <div
           style={{
             display: 'flex',
@@ -339,6 +380,7 @@ export default function Login() {
             </button>
           </motion.div>
         )}
+        </>)}
       </motion.div>
     </div>
   );

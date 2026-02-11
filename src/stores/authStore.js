@@ -53,12 +53,19 @@ export const useAuthStore = create((set, get) => ({
 
   signUp: async (email, password) => {
     set({ error: null });
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo },
+    });
     if (error) {
       set({ error: error.message });
       return { error };
     }
-    return { data };
+    // If no session returned, email confirmation is required
+    const needsConfirmation = data.user && !data.session;
+    return { data, needsConfirmation };
   },
 
   signInWithMagicLink: async (email) => {

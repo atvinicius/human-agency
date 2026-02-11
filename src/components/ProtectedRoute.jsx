@@ -13,8 +13,8 @@ export default function ProtectedRoute({ children }) {
   // Still initializing auth — don't redirect yet
   if (loading) return null;
 
-  // Not authenticated — redirect to login
-  if (!user) {
+  // Not authenticated or email not confirmed — redirect to login
+  if (!user || !user.email_confirmed_at) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

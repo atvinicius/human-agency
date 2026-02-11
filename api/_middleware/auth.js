@@ -27,6 +27,9 @@ export async function authenticateRequest(req) {
   const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
   if (error || !user) return null;
 
+  // Reject unverified users
+  if (!user.email_confirmed_at) return null;
+
   return user;
 }
 
