@@ -232,6 +232,10 @@ export default function AgentNode({
             <span style={{ color: 'var(--theme-accent)' }}>
               Awaiting input...
             </span>
+          ) : agent.context?.streamingText ? (
+            <span style={{ color: 'var(--theme-accent)', fontStyle: 'italic' }}>
+              {agent.context.streamingText.slice(-50)}
+            </span>
           ) : (
             currentActivity
           )}

@@ -1,10 +1,41 @@
 import { create } from 'zustand';
 
+// Importance levels: critical > important > normal > debug
+const IMPORTANCE_LEVELS = ['critical', 'important', 'normal', 'debug'];
+
+function classifyEventImportance(type, agent, updates) {
+  // Critical: requires human attention
+  if (type === 'input') return 'critical';
+  if (type === 'error') return 'critical';
+  if (type === 'complete' && agent?.role === 'coordinator') return 'critical';
+  if (updates?.status === 'failed') return 'critical';
+
+  // Important: notable milestones
+  if (type === 'spawn') return 'important';
+  if (type === 'complete') return 'important';
+  if (updates?.status === 'blocked') return 'important';
+
+  // Normal: operational events
+  if (type === 'pause') return 'normal';
+  if (type === 'resume') return 'normal';
+  if (type === 'status') return 'normal';
+
+  // Debug: routine progress
+  if (type === 'activity') return 'debug';
+
+  return 'normal';
+}
+
+function meetsMinImportance(importance, minImportance) {
+  return IMPORTANCE_LEVELS.indexOf(importance) <= IMPORTANCE_LEVELS.indexOf(minImportance);
+}
+
 export const useAgentStore = create((set, get) => ({
   agents: [],
   selectedAgentId: null,
   events: [],
   isPaused: false,
+  eventFilter: 'normal', // minimum importance level to show
   filters: {
     roles: [], // empty = show all
     statuses: [], // empty = show all
@@ -23,9 +54,10 @@ export const useAgentStore = create((set, get) => ({
           agentName: agent.name,
           message: `${agent.name} spawned as ${agent.role}`,
           timestamp: new Date(),
+          importance: classifyEventImportance('spawn', agent),
         },
         ...state.events,
-      ].slice(0, 100), // Keep last 100 events
+      ].slice(0, 100),
     })),
 
   updateAgent: (id, updates) =>
@@ -35,13 +67,15 @@ export const useAgentStore = create((set, get) => ({
 
       // Track status changes
       if (updates.status && agent && updates.status !== agent.status) {
+        const type = updates.status === 'completed' ? 'complete' : 'status';
         newEvents.unshift({
           id: Date.now(),
-          type: updates.status === 'completed' ? 'complete' : 'status',
+          type,
           agentId: id,
           agentName: agent.name,
           message: `${agent.name} ${updates.status}`,
           timestamp: new Date(),
+          importance: classifyEventImportance(type, agent, updates),
         });
       }
 
@@ -54,6 +88,7 @@ export const useAgentStore = create((set, get) => ({
           agentName: agent.name,
           message: updates.currentActivity,
           timestamp: new Date(),
+          importance: classifyEventImportance('activity', agent, updates),
         });
       }
 
@@ -92,6 +127,7 @@ export const useAgentStore = create((set, get) => ({
           agentName: agent.name,
           message: `${agent.name} paused`,
           timestamp: new Date(),
+          importance: 'normal',
         },
         ...state.events,
       ].slice(0, 100),
@@ -116,6 +152,7 @@ export const useAgentStore = create((set, get) => ({
           agentName: agent.name,
           message: `${agent.name} resumed`,
           timestamp: new Date(),
+          importance: 'normal',
         },
         ...state.events,
       ].slice(0, 100),
@@ -143,6 +180,7 @@ export const useAgentStore = create((set, get) => ({
             agentName: 'System',
             message: `All agents paused (${pausableAgents.length} affected)`,
             timestamp: new Date(),
+            importance: 'normal',
           },
           ...state.events,
         ].slice(0, 100),
@@ -168,6 +206,7 @@ export const useAgentStore = create((set, get) => ({
             agentName: 'System',
             message: `All agents resumed (${pausedAgents.length} affected)`,
             timestamp: new Date(),
+            importance: 'normal',
           },
           ...state.events,
         ].slice(0, 100),
@@ -202,11 +241,15 @@ export const useAgentStore = create((set, get) => ({
           agentName: agent.name,
           message: `Human input provided to ${agent.name}`,
           timestamp: new Date(),
+          importance: 'critical',
         },
         ...state.events,
       ].slice(0, 100),
     }));
   },
+
+  // Event filter
+  setEventFilter: (minImportance) => set({ eventFilter: minImportance }),
 
   // Filters
   setFilter: (filterType, values) =>
@@ -224,6 +267,7 @@ export const useAgentStore = create((set, get) => ({
       selectedAgentId: null,
       events: [],
       isPaused: false,
+      eventFilter: 'normal',
       filters: { roles: [], statuses: [], priorities: [] },
     }),
 
@@ -237,6 +281,15 @@ export const useAgentStore = create((set, get) => ({
       if (filters.priorities.length && !filters.priorities.includes(agent.priority)) return false;
       return true;
     });
+  },
+
+  getFilteredEvents: () => {
+    const { events, eventFilter } = get();
+    return events.filter((e) => meetsMinImportance(e.importance || 'normal', eventFilter));
+  },
+
+  getCriticalEventCount: () => {
+    return get().events.filter((e) => e.importance === 'critical').length;
   },
 
   getAgentById: (id) => get().agents.find((a) => a.id === id),

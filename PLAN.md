@@ -57,20 +57,38 @@ A visual "Mission Control" interface where humans direct swarms of AI agents. In
 - [x] Competitive landscape analysis ($5.4B → $47-52B market, 30+ competitors mapped)
 - [x] Technology catalog with adoption recommendations (Mem0, MCP, Vercel AI SDK, Langfuse)
 
+### Phase 3: Foundation Hardening
+- [x] Event importance classification — events tagged as critical/important/normal/debug (`agentStore.js`)
+- [x] Activity stream visual hierarchy with importance-based styling and filter pills (`ActivityStream.jsx`)
+- [x] Critical event count badge with pulse animation
+- [x] Priority request queue with concurrency control (3 concurrent, priority-ordered) (`requestQueue.js`)
+- [x] Rate limit handling (429 detection, automatic pause/retry)
+- [x] Context compression — rolling summaries every 3 iterations with sliding window (`contextCompressor.js`)
+- [x] Streaming responses via Vercel AI SDK + OpenRouter provider (`api/agent-stream.js`)
+- [x] Client-side stream parser for AI SDK data protocol (`streamParser.js`)
+- [x] Live "thinking" text display on agent nodes and detail panel during streaming
+- [x] Custom mission input — users type objectives, AI plans agent tree (`CustomMissionInput.jsx`)
+- [x] Mission planner Edge Function with streaming output (`api/plan-mission.js`)
+- [x] Plan preview with agent tree visualization before launch
+
 ---
 
 ## Current Architecture
 
 ```
-User → Landing.jsx → /demo → Demo.jsx → PresetSelector
-                                  ↓
-                        OrchestrationService
-                          ↓              ↓
-                    AgentStore       /api/agent (Edge Function)
-                    (Zustand)            ↓
-                        ↓           OpenRouter → Kimi K2
-                    AgentMap             ↓
-                    (D3 viz)        Supabase (optional persist)
+User → Landing.jsx → /demo → Demo.jsx → PresetSelector / CustomMissionInput
+                                  ↓                            ↓
+                        OrchestrationService          /api/plan-mission (streaming)
+                          ↓          ↓                         ↓
+                    RequestQueue  AgentStore          Agent tree preview → Launch
+                       ↓          (Zustand)
+                /api/agent-stream (SSE)
+                       ↓
+                OpenRouter → Kimi K2 (streaming)
+                       ↓
+               ContextCompressor (every 3 iterations)
+                       ↓
+                AgentMap (D3 viz) + ActivityStream (filtered by importance)
 ```
 
 ### Directory Structure
@@ -93,10 +111,14 @@ src/
 │   ├── stream/
 │   │   └── ActivityStream.jsx      # Event feed
 │   ├── PresetSelector.jsx          # Demo scenario picker
+│   ├── CustomMissionInput.jsx      # Custom objective → AI-planned agent tree
 │   └── ThemeToggle.jsx             # Dark/light mode
 │
 ├── services/
-│   ├── orchestrationService.js     # Core execution engine (real AI)
+│   ├── orchestrationService.js     # Core execution engine (real AI + streaming)
+│   ├── requestQueue.js             # Priority queue for concurrent LLM calls
+│   ├── contextCompressor.js        # Rolling context summaries
+│   ├── streamParser.js             # AI SDK data stream parser
 │   ├── mockAgentService.js         # Fake agent simulator
 │   └── presetService.js            # Demo scenario definitions
 │
@@ -112,7 +134,9 @@ src/
     └── layoutEngine.js             # D3 hierarchical layout
 
 api/
-└── agent.js                        # Vercel Edge Function (LLM proxy)
+├── agent.js                        # Vercel Edge Function (LLM proxy, non-streaming)
+├── agent-stream.js                 # Streaming Edge Function (AI SDK + SSE)
+└── plan-mission.js                 # Mission planner Edge Function (streaming)
 
 docs/
 ├── architecture-analysis-llm-coordination.md
@@ -152,14 +176,15 @@ Identified through architecture analysis and real-world demo usage:
 
 ## Roadmap
 
-### Phase 3: Foundation Hardening
+### Phase 3: Foundation Hardening ✓
 
 Focus: Make the existing demo reliable, efficient, and ready for real usage.
 
-- [ ] **Request queue with priority** — Token bucket or priority queue for concurrent agents. Critical agents get priority over background work. Prevents API rate limit issues.
-- [ ] **Context compression** — Rolling summaries or context windowing so agents don't resend full history every iteration. Reduce token waste.
-- [ ] **Streaming responses** — Migrate `api/agent.js` and `orchestrationService.js` to Vercel AI SDK. Use `useChat`/`useObject` hooks for progressive output. Replace manual fetch with SDK streaming.
-- [ ] **Event importance classification** — Tag events as critical / informational / debug. Surface critical decisions, collapse noise.
+- [x] **Request queue with priority** — Priority queue (3 concurrent, 5 levels) with rate limit handling and adaptive retry. (`requestQueue.js`)
+- [x] **Context compression** — Rolling summaries every 3 iterations with sliding window, LLM-based summarization with truncation fallback. (`contextCompressor.js`)
+- [x] **Streaming responses** — AI SDK `streamText` via OpenRouter provider. New streaming Edge Function + client stream parser. Live "thinking" text on agent nodes. (`api/agent-stream.js`, `streamParser.js`)
+- [x] **Event importance classification** — Deterministic classification (critical/important/normal/debug). Visual hierarchy in ActivityStream with filter pills and critical count badge. (`agentStore.js`, `ActivityStream.jsx`)
+- [x] **Custom mission input** — Users type free-text objectives. AI planner decomposes into agent tree. Preview with tree visualization before launch. (`CustomMissionInput.jsx`, `api/plan-mission.js`)
 - [ ] **Supabase as source of truth** — Wire up Realtime subscriptions. Zustand becomes a projection of server state. Optimistic updates with rollback on conflict.
 
 ### Phase 4: Agent Cohesion
@@ -222,12 +247,13 @@ Focus: From demo to real product.
 | Database | Supabase (optional) |
 | API | Vercel Edge Functions |
 | LLM | OpenRouter → Kimi K2 |
+| Streaming | Vercel AI SDK (`ai`, `@openrouter/ai-sdk-provider`) |
+| Validation | Zod 3 |
 | Mock Data | Faker.js 9 |
 
 ### Planned Additions
 | Technology | Purpose | Phase |
 |-----------|---------|-------|
-| Vercel AI SDK | Streaming, structured output, durable agents | 3 |
 | Mem0 or custom | Shared agent memory / context layer | 4 |
 | Langfuse | LLM observability and tracing | 7 |
 | MCP | Standard tool/resource integration | 7 |

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Clock, Users, Sparkles, ChevronRight, X } from 'lucide-react';
 import { getPresets } from '../services/presetService';
+import CustomMissionInput from './CustomMissionInput';
 
 const categoryColors = {
   development: 'hsl(150, 70%, 50%)',
@@ -172,6 +173,11 @@ export default function PresetSelector({ onSelect, onClose }) {
                 gap: '16px',
               }}
             >
+              {/* Custom mission input — always shown at top */}
+              {!selectedCategory && (
+                <CustomMissionInput onSelect={onSelect} />
+              )}
+
               <AnimatePresence mode="popLayout">
                 {filteredPresets.map((preset) => (
                   <motion.div
@@ -331,7 +337,7 @@ export default function PresetSelector({ onSelect, onClose }) {
         >
           <Sparkles size={14} style={{ color: 'var(--theme-accent)' }} />
           <span style={{ fontSize: '12px', color: 'var(--theme-text-muted)' }}>
-            Each scenario demonstrates real AI agents working in parallel
+            Choose a preset or define your own mission — real AI agents working in parallel
           </span>
         </div>
       </motion.div>

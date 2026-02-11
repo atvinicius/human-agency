@@ -120,6 +120,29 @@ function DetailPanel({ agent, onClose, onPause, onResume, onDive }) {
         </div>
       </div>
 
+      {/* Live streaming text */}
+      {agent.context?.streamingText && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--theme-accent)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Thinking...
+          </div>
+          <div style={{
+            fontSize: '12px',
+            color: 'var(--theme-text-secondary)',
+            fontStyle: 'italic',
+            lineHeight: 1.5,
+            maxHeight: '80px',
+            overflow: 'hidden',
+            background: 'var(--theme-surface-elevated)',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            borderLeft: '2px solid var(--theme-accent)',
+          }}>
+            {agent.context.streamingText}
+          </div>
+        </div>
+      )}
+
       <QuickActions
         agent={agent}
         onPause={onPause}
@@ -221,8 +244,8 @@ export default function Demo() {
   const {
     agents,
     selectedAgentId,
-    events,
     isPaused,
+    eventFilter,
     selectAgent,
     clearSelection,
     pauseAgent,
@@ -231,9 +254,15 @@ export default function Demo() {
     resumeAll,
     respondToInput,
     reset,
+    setEventFilter,
     getAgentById,
     getStats,
+    getFilteredEvents,
+    getCriticalEventCount,
   } = useAgentStore();
+
+  const events = getFilteredEvents();
+  const criticalCount = getCriticalEventCount();
 
   const selectedAgent = selectedAgentId ? getAgentById(selectedAgentId) : null;
   const waitingAgent = agents.find((a) => a.pendingInput || a.pending_input);
@@ -499,7 +528,13 @@ export default function Demo() {
 
         {/* Activity stream sidebar */}
         <div style={{ width: '320px', flexShrink: 0 }}>
-          <ActivityStream events={events} onEventClick={handleEventClick} />
+          <ActivityStream
+            events={events}
+            onEventClick={handleEventClick}
+            eventFilter={eventFilter}
+            onFilterChange={setEventFilter}
+            criticalCount={criticalCount}
+          />
         </div>
       </div>
 

@@ -1,7 +1,13 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAgentStore } from '../stores/agentStore';
+import { RequestQueue } from './requestQueue';
+import { shouldCompress, compressContext } from './contextCompressor';
+import { parseDataStream, parseAgentResponse } from './streamParser';
 
-// Call AI through Vercel API route (keeps key server-side)
+// Shared request queue — 3 concurrent LLM calls, priority-ordered
+const requestQueue = new RequestQueue({ concurrency: 3 });
+
+// Call AI through Vercel API route — non-streaming fallback
 async function callAgent(agent, messages) {
   const response = await fetch('/api/agent', {
     method: 'POST',
@@ -11,10 +17,38 @@ async function callAgent(agent, messages) {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'AI request failed');
+    const err = new Error(error.error || 'AI request failed');
+    err.status = response.status;
+    throw err;
   }
 
   return response.json();
+}
+
+// Call AI with streaming — returns parsed result, calls onDelta during stream
+async function callAgentStream(agent, messages, onDelta) {
+  const response = await fetch('/api/agent-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent, messages }),
+  });
+
+  if (!response.ok) {
+    // Streaming endpoint failed — fall back to non-streaming
+    const errorData = await response.json().catch(() => ({}));
+    const err = new Error(errorData.error || 'AI stream request failed');
+    err.status = response.status;
+    throw err;
+  }
+
+  // Read the stream with live deltas
+  const fullText = await parseDataStream(response, (delta, accumulated) => {
+    onDelta?.(delta, accumulated);
+  });
+
+  // Parse the accumulated text as structured JSON
+  const result = parseAgentResponse(fullText);
+  return { result, usage: null };
 }
 
 // Create agent from config
@@ -81,7 +115,7 @@ async function executeAgent(agentId, store) {
   });
 
   // Get conversation history
-  const messages = [
+  let messages = [
     {
       role: 'user',
       content: `Begin working on your objective: ${agent.objective}`,
@@ -108,10 +142,35 @@ async function executeAgent(agentId, store) {
     }
 
     try {
-      // Call AI
-      const { result, usage } = await callAgent(currentAgent, messages);
+      // Compress context every 3 iterations to reduce token usage
+      if (shouldCompress(iterations, messages.length)) {
+        messages = await compressContext(messages, currentAgent.objective, (agent, msgs) =>
+          requestQueue.enqueue(agentId, 'background', () => callAgent(agent, msgs))
+        );
+      }
 
-      // Update activity
+      // Call AI through priority queue with streaming
+      let streamingText = '';
+      const { result, usage } = await requestQueue.enqueue(
+        agentId,
+        currentAgent.priority || 'normal',
+        () => callAgentStream(currentAgent, messages, (delta, accumulated) => {
+          // Live UI updates as stream arrives
+          streamingText = accumulated;
+          // Throttle UI updates to every ~100 chars
+          if (accumulated.length % 100 < delta.length) {
+            store.updateAgent(agentId, {
+              current_activity: 'Thinking...',
+              context: {
+                ...store.getAgentById(agentId)?.context,
+                streamingText: accumulated.slice(-200), // Show last 200 chars
+              },
+            });
+          }
+        })
+      );
+
+      // Clear streaming text and apply final result
       store.updateAgent(agentId, {
         current_activity: result.activity || 'Processing...',
         progress: Math.min(100, currentAgent.progress + (result.progress_delta || 5)),
@@ -119,6 +178,7 @@ async function executeAgent(agentId, store) {
           ...currentAgent.context,
           lastThinking: result.thinking,
           lastOutput: result.output,
+          streamingText: null,
         },
       });
 
@@ -177,10 +237,11 @@ async function executeAgent(agentId, store) {
         content: 'Continue working. What is your next step?',
       });
 
-      // Small delay between iterations
-      await new Promise((r) => setTimeout(r, 2000));
+      // Brief delay between iterations for UI legibility
+      await new Promise((r) => setTimeout(r, 500));
 
     } catch (error) {
+      if (error.message === 'Cancelled') break;
       console.error(`Agent ${agentId} error:`, error);
       store.updateAgent(agentId, {
         status: 'failed',
@@ -243,6 +304,7 @@ export class OrchestrationService {
 
   stop() {
     this.running = false;
+    requestQueue.cancelAll();
     // Mark session as completed
     if (isSupabaseConfigured() && this.sessionId) {
       supabase.from('sessions').update({ status: 'completed' }).eq('id', this.sessionId);

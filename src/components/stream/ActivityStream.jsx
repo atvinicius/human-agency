@@ -9,6 +9,7 @@ import {
   Activity,
   AlertCircle,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 
 const eventIcons = {
@@ -33,6 +34,45 @@ const eventColors = {
   error: 'hsl(0, 70%, 50%)',
 };
 
+// Visual treatment per importance level
+const importanceStyles = {
+  critical: {
+    borderLeft: '3px solid hsl(0, 70%, 55%)',
+    background: 'hsl(0, 70%, 55%, 0.06)',
+    fontWeight: 500,
+    opacity: 1,
+    fontSize: '12px',
+  },
+  important: {
+    borderLeft: '2px solid var(--theme-accent)',
+    background: 'transparent',
+    fontWeight: 400,
+    opacity: 1,
+    fontSize: '12px',
+  },
+  normal: {
+    borderLeft: 'none',
+    background: 'transparent',
+    fontWeight: 400,
+    opacity: 0.85,
+    fontSize: '12px',
+  },
+  debug: {
+    borderLeft: 'none',
+    background: 'transparent',
+    fontWeight: 400,
+    opacity: 0.5,
+    fontSize: '11px',
+  },
+};
+
+const filterOptions = [
+  { key: 'debug', label: 'All' },
+  { key: 'normal', label: 'Normal+' },
+  { key: 'important', label: 'Important+' },
+  { key: 'critical', label: 'Critical' },
+];
+
 function formatTime(date) {
   return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -41,7 +81,7 @@ function formatTime(date) {
   });
 }
 
-export default function ActivityStream({ events, onEventClick }) {
+export default function ActivityStream({ events, onEventClick, eventFilter, onFilterChange, criticalCount }) {
   const containerRef = useRef(null);
 
   // Auto-scroll to top when new events arrive
@@ -64,33 +104,76 @@ export default function ActivityStream({ events, onEventClick }) {
       {/* Header */}
       <div
         style={{
-          padding: '16px',
+          padding: '12px 16px',
           borderBottom: '1px solid var(--theme-border)',
           display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          flexDirection: 'column',
+          gap: '10px',
         }}
       >
-        <Activity size={16} style={{ color: 'var(--theme-text-muted)' }} />
-        <span
-          style={{
-            fontSize: '13px',
-            fontWeight: 500,
-            color: 'var(--theme-text-primary)',
-            letterSpacing: '0.02em',
-          }}
-        >
-          Activity Stream
-        </span>
-        <span
-          style={{
-            fontSize: '11px',
-            color: 'var(--theme-text-muted)',
-            marginLeft: 'auto',
-          }}
-        >
-          {events.length} events
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Activity size={16} style={{ color: 'var(--theme-text-muted)' }} />
+          <span
+            style={{
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--theme-text-primary)',
+              letterSpacing: '0.02em',
+            }}
+          >
+            Activity Stream
+          </span>
+          {criticalCount > 0 && (
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                padding: '2px 6px',
+                background: 'hsl(0, 70%, 55%)',
+                color: '#fff',
+                borderRadius: '8px',
+                minWidth: '18px',
+                textAlign: 'center',
+                animation: 'pulse 1.5s infinite',
+              }}
+            >
+              {criticalCount}
+            </span>
+          )}
+          <span
+            style={{
+              fontSize: '11px',
+              color: 'var(--theme-text-muted)',
+              marginLeft: 'auto',
+            }}
+          >
+            {events.length} events
+          </span>
+        </div>
+
+        {/* Filter pills */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {filterOptions.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => onFilterChange?.(key)}
+              style={{
+                padding: '3px 8px',
+                fontSize: '10px',
+                fontWeight: eventFilter === key ? 600 : 400,
+                background: eventFilter === key ? 'var(--theme-accent)' : 'transparent',
+                color: eventFilter === key ? 'var(--theme-accent-text)' : 'var(--theme-text-muted)',
+                border: eventFilter === key ? 'none' : '1px solid var(--theme-border)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                letterSpacing: '0.02em',
+                transition: 'all 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Event list */}
@@ -106,18 +189,22 @@ export default function ActivityStream({ events, onEventClick }) {
           {events.map((event) => {
             const Icon = eventIcons[event.type] || Activity;
             const color = eventColors[event.type] || 'var(--theme-text-secondary)';
+            const importance = event.importance || 'normal';
+            const style = importanceStyles[importance];
 
             return (
               <motion.div
                 key={event.id}
                 initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
+                animate={{ opacity: style.opacity, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => onEventClick?.(event.agentId)}
                 style={{
-                  padding: '12px 16px',
+                  padding: importance === 'debug' ? '8px 16px' : '12px 16px',
                   borderBottom: '1px solid var(--theme-border)',
+                  borderLeft: style.borderLeft,
+                  background: style.background,
                   cursor: event.agentId ? 'pointer' : 'default',
                   transition: 'background 0.2s',
                 }}
@@ -127,7 +214,7 @@ export default function ActivityStream({ events, onEventClick }) {
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.background = style.background;
                 }}
               >
                 <div
@@ -140,25 +227,30 @@ export default function ActivityStream({ events, onEventClick }) {
                   {/* Icon */}
                   <div
                     style={{
-                      width: '24px',
-                      height: '24px',
+                      width: importance === 'critical' ? '28px' : '24px',
+                      height: importance === 'critical' ? '28px' : '24px',
                       borderRadius: '6px',
-                      background: `${color}15`,
+                      background: importance === 'critical' ? `${color}25` : `${color}15`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
                   >
-                    <Icon size={12} style={{ color }} />
+                    {importance === 'critical' ? (
+                      <AlertTriangle size={14} style={{ color }} />
+                    ) : (
+                      <Icon size={12} style={{ color }} />
+                    )}
                   </div>
 
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: '12px',
-                        color: 'var(--theme-text-primary)',
+                        fontSize: style.fontSize,
+                        fontWeight: style.fontWeight,
+                        color: importance === 'debug' ? 'var(--theme-text-muted)' : 'var(--theme-text-primary)',
                         marginBottom: '2px',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -166,12 +258,12 @@ export default function ActivityStream({ events, onEventClick }) {
                       }}
                     >
                       {event.agentName && (
-                        <span style={{ color, fontWeight: 500 }}>
+                        <span style={{ color: importance === 'debug' ? 'var(--theme-text-muted)' : color, fontWeight: 500 }}>
                           {event.agentName}
                         </span>
                       )}
                       {event.agentName && ' — '}
-                      <span style={{ color: 'var(--theme-text-secondary)' }}>
+                      <span style={{ color: importance === 'debug' ? 'var(--theme-text-muted)' : 'var(--theme-text-secondary)' }}>
                         {event.message}
                       </span>
                     </div>
@@ -203,6 +295,13 @@ export default function ActivityStream({ events, onEventClick }) {
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
     </div>
   );
 }
