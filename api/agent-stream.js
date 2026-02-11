@@ -112,7 +112,7 @@ Respond with a JSON object containing:
       maxTokens: 2000,
     });
 
-    return result.toDataStreamResponse({
+    return result.toTextStreamResponse({
       headers: corsHeaders,
     });
   } catch (error) {

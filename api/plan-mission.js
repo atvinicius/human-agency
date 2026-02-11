@@ -107,7 +107,7 @@ export default async function handler(req) {
       maxTokens: 3000,
     });
 
-    return result.toDataStreamResponse({
+    return result.toTextStreamResponse({
       headers: corsHeaders,
     });
   } catch (error) {
