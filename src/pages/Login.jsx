@@ -16,7 +16,7 @@ export default function Login() {
   const signInWithMagicLink = useAuthStore((s) => s.signInWithMagicLink);
   const clearError = useAuthStore((s) => s.clearError);
 
-  const [method, setMethod] = useState('password'); // 'password' | 'magic'
+  const [method, setMethod] = useState('magic'); // 'magic' | 'password'
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -172,8 +172,8 @@ export default function Login() {
           }}
         >
           {[
-            { key: 'password', label: 'Email & Password' },
             { key: 'magic', label: 'Magic Link' },
+            { key: 'password', label: 'Email & Password' },
           ].map(({ key, label }) => (
             <button
               key={key}
