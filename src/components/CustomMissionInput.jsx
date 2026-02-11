@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, Loader, Play, ArrowLeft, AlertCircle } from 'lucide-react';
 import { parseDataStream, parseAgentResponse } from '../services/streamParser';
+import { useAuthStore } from '../stores/authStore';
 
 // Count agents in a nested config tree
 function countAgents(config) {
@@ -50,9 +51,13 @@ export default function CustomMissionInput({ onSelect }) {
     setError(null);
 
     try {
+      const token = useAuthStore.getState().getAccessToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
       const response = await fetch('/api/plan-mission', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ objective: objective.trim() }),
       });
 

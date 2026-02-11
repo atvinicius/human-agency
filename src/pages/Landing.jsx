@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Check, Play } from 'lucide-react';
+import { ArrowRight, Check, Play, LogIn } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import { useAuthStore } from '../stores/authStore';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -18,6 +20,9 @@ const stagger = {
 };
 
 function Header() {
+  const user = useAuthStore((s) => s.user);
+  const showAuth = isSupabaseConfigured();
+
   return (
     <header style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, padding: '1.5rem' }}>
       <div style={{ maxWidth: '56rem', marginLeft: 'auto', marginRight: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -25,23 +30,43 @@ function Header() {
           Human Agency
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <Link
-            to="/demo"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              color: 'var(--theme-accent)',
-              textDecoration: 'none',
-              transition: 'color 0.3s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-text-primary)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--theme-accent)'}
-          >
-            <Play size={14} />
-            Try Demo
-          </Link>
+          {showAuth && !user ? (
+            <Link
+              to="/login"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                color: 'var(--theme-accent)',
+                textDecoration: 'none',
+                transition: 'color 0.3s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-text-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--theme-accent)'}
+            >
+              <LogIn size={14} />
+              Sign In
+            </Link>
+          ) : (
+            <Link
+              to="/demo"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                color: 'var(--theme-accent)',
+                textDecoration: 'none',
+                transition: 'color 0.3s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-text-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--theme-accent)'}
+            >
+              <Play size={14} />
+              {showAuth && user ? 'Mission Control' : 'Try Demo'}
+            </Link>
+          )}
           <a
             href="#waitlist"
             className="btn-minimal"

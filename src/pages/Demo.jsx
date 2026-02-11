@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAgentStore } from '../stores/agentStore';
 import { MockAgentSimulator } from '../services/mockAgentService';
@@ -11,6 +11,8 @@ import InterventionPanel from '../components/intervention/InterventionPanel';
 import QuickActions from '../components/intervention/QuickActions';
 import PresetSelector from '../components/PresetSelector';
 import ThemeToggle from '../components/ThemeToggle';
+import { useAuthStore } from '../stores/authStore';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { mapColors, getAgentColor } from '../utils/colorScheme';
 
 function DetailPanel({ agent, onClose, onPause, onResume, onDive }) {
@@ -232,6 +234,7 @@ function MissionHeader({ preset, stats, elapsedTime }) {
 }
 
 export default function Demo() {
+  const navigate = useNavigate();
   const simulatorRef = useRef(null);
   const orchestratorRef = useRef(null);
   const [showPresetSelector, setShowPresetSelector] = useState(true);
@@ -240,6 +243,14 @@ export default function Demo() {
   const [useRealAI, setUseRealAI] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const startTimeRef = useRef(null);
+
+  const authUser = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const {
     agents,
@@ -444,6 +455,32 @@ export default function Demo() {
             Info
           </button>
           <ThemeToggle size="small" />
+          {isSupabaseConfigured() && authUser && (
+            <>
+              <div style={{ width: '1px', height: '24px', background: 'var(--theme-border)' }} />
+              <span style={{ fontSize: '12px', color: 'var(--theme-text-muted)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {authUser.email}
+              </span>
+              <button
+                onClick={handleSignOut}
+                title="Sign out"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 10px',
+                  background: 'transparent',
+                  border: '1px solid var(--theme-border)',
+                  borderRadius: '6px',
+                  color: 'var(--theme-text-muted)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <LogOut size={14} />
+              </button>
+            </>
+          )}
         </div>
       </header>
 

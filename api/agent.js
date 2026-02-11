@@ -2,6 +2,7 @@
 // This runs server-side, keeping API keys secure
 
 import { createClient } from '@supabase/supabase-js';
+import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
 
 export const config = {
   runtime: 'edge',
@@ -142,7 +143,7 @@ export default async function handler(req) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 
   if (req.method === 'OPTIONS') {
@@ -161,6 +162,12 @@ export default async function handler(req) {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  }
+
+  // Authenticate request (if Supabase auth is configured)
+  const authUser = await authenticateRequest(req);
+  if (SUPABASE_URL && SUPABASE_SERVICE_KEY && !authUser) {
+    return unauthorizedResponse(corsHeaders);
   }
 
   try {

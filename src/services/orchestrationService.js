@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAgentStore } from '../stores/agentStore';
+import { useAuthStore } from '../stores/authStore';
 import { RequestQueue } from './requestQueue';
 import { shouldCompress, compressContext } from './contextCompressor';
 import { parseDataStream, parseAgentResponse } from './streamParser';
@@ -7,11 +8,17 @@ import { parseDataStream, parseAgentResponse } from './streamParser';
 // Shared request queue — 3 concurrent LLM calls, priority-ordered
 const requestQueue = new RequestQueue({ concurrency: 3 });
 
+// Build auth headers from current session
+function getAuthHeaders() {
+  const token = useAuthStore.getState().getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Call AI through Vercel API route — non-streaming fallback
 async function callAgent(agent, messages) {
   const response = await fetch('/api/agent', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ agent, messages }),
   });
 
@@ -29,7 +36,7 @@ async function callAgent(agent, messages) {
 async function callAgentStream(agent, messages, onDelta) {
   const response = await fetch('/api/agent-stream', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ agent, messages }),
   });
 
@@ -271,12 +278,14 @@ export class OrchestrationService {
 
     // Create session in Supabase
     if (isSupabaseConfigured()) {
+      const userId = useAuthStore.getState().user?.id;
       await supabase.from('sessions').insert({
         id: this.sessionId,
         name: preset.name,
         preset_id: preset.id,
         objective: preset.initial_objective,
         status: 'active',
+        ...(userId && { user_id: userId }),
       });
     }
 
