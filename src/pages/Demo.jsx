@@ -6,154 +6,12 @@ import { useAgentStore } from '../stores/agentStore';
 import { MockAgentSimulator } from '../services/mockAgentService';
 import { getOrchestrationService } from '../services/orchestrationService';
 import AgentMap from '../components/map/AgentMap';
-import ActivityStream from '../components/stream/ActivityStream';
-import InterventionPanel from '../components/intervention/InterventionPanel';
-import QuickActions from '../components/intervention/QuickActions';
+import PulseBar from '../components/timeline/PulseBar';
 import PresetSelector from '../components/PresetSelector';
 import ThemeToggle from '../components/ThemeToggle';
 import { useAuthStore } from '../stores/authStore';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { mapColors, getAgentColor } from '../utils/colorScheme';
-
-function DetailPanel({ agent, onClose, onPause, onResume, onDive }) {
-  if (!agent) return null;
-
-  const color = getAgentColor(agent.role, agent.status);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      style={{
-        position: 'absolute',
-        bottom: '80px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'var(--theme-surface)',
-        border: '1px solid var(--theme-border)',
-        borderRadius: '12px',
-        padding: '20px',
-        minWidth: '400px',
-        maxWidth: '600px',
-        zIndex: 150,
-        boxShadow: 'var(--theme-shadow)',
-      }}
-    >
-      <button
-        onClick={onClose}
-        style={{
-          position: 'absolute',
-          top: '12px',
-          right: '12px',
-          background: 'transparent',
-          border: 'none',
-          padding: '4px',
-          cursor: 'pointer',
-          color: 'var(--theme-text-muted)',
-        }}
-      >
-        <X size={16} />
-      </button>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-        <div
-          style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            background: color,
-          }}
-        />
-        <div>
-          <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--theme-text-primary)' }}>
-            {agent.name}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--theme-text-muted)', textTransform: 'capitalize' }}>
-            {agent.role} • {agent.status} • {agent.priority} priority
-          </div>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '11px', color: 'var(--theme-text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Objective
-        </div>
-        <div style={{ fontSize: '14px', color: 'var(--theme-text-secondary)' }}>
-          {agent.objective}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--theme-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Progress
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--theme-text-primary)' }}>
-            {Math.round(agent.progress)}%
-          </span>
-        </div>
-        <div
-          style={{
-            height: '6px',
-            background: 'var(--theme-border)',
-            borderRadius: '3px',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              width: `${agent.progress}%`,
-              height: '100%',
-              background: color,
-              borderRadius: '3px',
-              transition: 'width 0.3s',
-            }}
-          />
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '11px', color: 'var(--theme-text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Current Activity
-        </div>
-        <div style={{ fontSize: '14px', color: 'var(--theme-text-primary)' }}>
-          {agent.currentActivity || agent.current_activity}
-        </div>
-      </div>
-
-      {/* Live streaming text */}
-      {agent.context?.streamingText && (
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--theme-accent)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Thinking...
-          </div>
-          <div style={{
-            fontSize: '12px',
-            color: 'var(--theme-text-secondary)',
-            fontStyle: 'italic',
-            lineHeight: 1.5,
-            maxHeight: '80px',
-            overflow: 'hidden',
-            background: 'var(--theme-surface-elevated)',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            borderLeft: '2px solid var(--theme-accent)',
-          }}>
-            {agent.context.streamingText}
-          </div>
-        </div>
-      )}
-
-      <QuickActions
-        agent={agent}
-        onPause={onPause}
-        onResume={onResume}
-        onDive={onDive}
-      />
-    </motion.div>
-  );
-}
+import { getAgentColor } from '../utils/colorScheme';
 
 function MissionHeader({ preset, stats, elapsedTime }) {
   if (!preset) return null;
@@ -242,6 +100,7 @@ export default function Demo() {
   const [currentPreset, setCurrentPreset] = useState(null);
   const [useRealAI, setUseRealAI] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [focusedAgentId, setFocusedAgentId] = useState(null);
   const startTimeRef = useRef(null);
 
   const authUser = useAuthStore((s) => s.user);
@@ -256,7 +115,6 @@ export default function Demo() {
     agents,
     selectedAgentId,
     isPaused,
-    eventFilter,
     selectAgent,
     clearSelection,
     pauseAgent,
@@ -265,19 +123,21 @@ export default function Demo() {
     resumeAll,
     respondToInput,
     reset,
-    setEventFilter,
     getAgentById,
     getStats,
-    getFilteredEvents,
-    getCriticalEventCount,
   } = useAgentStore();
 
-  const events = getFilteredEvents();
-  const criticalCount = getCriticalEventCount();
-
-  const selectedAgent = selectedAgentId ? getAgentById(selectedAgentId) : null;
-  const waitingAgent = agents.find((a) => a.pendingInput || a.pending_input);
   const stats = getStats();
+
+  // Auto-focus on agents that need input
+  const waitingAgent = agents.find((a) => a.pendingInput || a.pending_input);
+  useEffect(() => {
+    if (waitingAgent && !focusedAgentId) {
+      setFocusedAgentId(waitingAgent.id);
+    } else if (!waitingAgent && focusedAgentId) {
+      setFocusedAgentId(null);
+    }
+  }, [waitingAgent?.id]);
 
   // Elapsed time timer
   useEffect(() => {
@@ -299,13 +159,10 @@ export default function Demo() {
     startTimeRef.current = Date.now();
     setElapsedTime(0);
 
-    // Use real AI via OpenRouter (requires OPENROUTER_API_KEY env var)
-    // Falls back to mock simulation if useRealAI is disabled
     if (useRealAI) {
       orchestratorRef.current = getOrchestrationService();
       await orchestratorRef.current.startSession(preset);
     } else {
-      // Use mock simulation with preset's agent config
       simulatorRef.current = new MockAgentSimulator(useAgentStore.getState());
       simulatorRef.current.store = useAgentStore.getState();
 
@@ -315,7 +172,6 @@ export default function Demo() {
         }
       });
 
-      // Custom initialization from preset
       simulatorRef.current.startWithPreset(preset);
     }
   };
@@ -326,6 +182,7 @@ export default function Demo() {
     reset();
     setCurrentPreset(null);
     setElapsedTime(0);
+    setFocusedAgentId(null);
     setShowPresetSelector(true);
   };
 
@@ -341,10 +198,13 @@ export default function Demo() {
     selectAgent(agentId);
   };
 
-  const handleEventClick = (agentId) => {
-    if (agentId) {
-      selectAgent(agentId);
-    }
+  const handleRespondToInput = (agentId, response) => {
+    respondToInput(agentId, response);
+    setFocusedAgentId(null);
+  };
+
+  const handleUnfocusAgent = () => {
+    setFocusedAgentId(null);
   };
 
   // Cleanup on unmount
@@ -484,105 +344,76 @@ export default function Demo() {
         </div>
       </header>
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Map area */}
-        <div style={{ flex: 1, position: 'relative' }}>
-          <AgentMap
-            agents={agents}
-            selectedAgentId={selectedAgentId}
-            onSelectAgent={selectAgent}
-            onPauseAgent={pauseAgent}
-            onResumeAgent={resumeAgent}
-            onDiveAgent={handleDive}
-            isPaused={isPaused}
-            onTogglePause={handleTogglePause}
-            onReset={handleReset}
-            stats={stats}
-          />
+      {/* Full-width map area */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <AgentMap
+          agents={agents}
+          selectedAgentId={selectedAgentId}
+          onSelectAgent={(id) => id ? selectAgent(id) : clearSelection()}
+          onPauseAgent={pauseAgent}
+          onResumeAgent={resumeAgent}
+          onDiveAgent={handleDive}
+          onRespondToInput={handleRespondToInput}
+          isPaused={isPaused}
+          onTogglePause={handleTogglePause}
+          onReset={handleReset}
+          stats={stats}
+          focusedAgentId={focusedAgentId}
+          onFocusAgent={setFocusedAgentId}
+          onUnfocusAgent={handleUnfocusAgent}
+        />
 
-          {/* Mission header */}
-          {currentPreset && (
-            <MissionHeader preset={currentPreset} stats={stats} elapsedTime={elapsedTime} />
-          )}
+        {/* Mission header */}
+        {currentPreset && (
+          <MissionHeader preset={currentPreset} stats={stats} elapsedTime={elapsedTime} />
+        )}
 
-          {/* Selected agent detail panel */}
-          <AnimatePresence>
-            {selectedAgent && !selectedAgent.pendingInput && !selectedAgent.pending_input && (
-              <DetailPanel
-                agent={selectedAgent}
-                onClose={clearSelection}
-                onPause={pauseAgent}
-                onResume={resumeAgent}
-                onDive={handleDive}
-              />
-            )}
-          </AnimatePresence>
+        {/* PulseBar (bottom timeline) */}
+        {currentPreset && <PulseBar />}
 
-          {/* Empty state - no mission selected */}
-          {!currentPreset && agents.length === 0 && (
-            <div
+        {/* Empty state - no mission selected */}
+        {!currentPreset && agents.length === 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+            }}
+          >
+            <Rocket size={48} style={{ color: 'var(--theme-text-muted)', marginBottom: '16px' }} />
+            <h2
+              className="font-serif"
+              style={{ fontSize: '24px', color: 'var(--theme-text-primary)', marginBottom: '8px' }}
+            >
+              No Active Mission
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--theme-text-secondary)', marginBottom: '24px' }}>
+              Choose a scenario to see agents in action
+            </p>
+            <button
+              onClick={() => setShowPresetSelector(true)}
               style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                textAlign: 'center',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 24px',
+                background: 'var(--theme-accent)',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'var(--theme-accent-text)',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
               }}
             >
-              <Rocket size={48} style={{ color: 'var(--theme-text-muted)', marginBottom: '16px' }} />
-              <h2
-                className="font-serif"
-                style={{ fontSize: '24px', color: 'var(--theme-text-primary)', marginBottom: '8px' }}
-              >
-                No Active Mission
-              </h2>
-              <p style={{ fontSize: '14px', color: 'var(--theme-text-secondary)', marginBottom: '24px' }}>
-                Choose a scenario to see agents in action
-              </p>
-              <button
-                onClick={() => setShowPresetSelector(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 24px',
-                  background: 'var(--theme-accent)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'var(--theme-accent-text)',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-              >
-                <Rocket size={16} />
-                Launch Mission
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Activity stream sidebar */}
-        <div style={{ width: '320px', flexShrink: 0 }}>
-          <ActivityStream
-            events={events}
-            onEventClick={handleEventClick}
-            eventFilter={eventFilter}
-            onFilterChange={setEventFilter}
-            criticalCount={criticalCount}
-          />
-        </div>
+              <Rocket size={16} />
+              Launch Mission
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Human input panel */}
-      {waitingAgent && (
-        <InterventionPanel
-          agent={waitingAgent}
-          onRespond={respondToInput}
-          onClose={() => {}}
-        />
-      )}
 
       {/* Preset selector */}
       <AnimatePresence>
@@ -645,11 +476,12 @@ export default function Demo() {
 
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '13px', color: 'var(--theme-text-primary)', marginBottom: '12px' }}>
-                  The 1:1,000,000 Ratio
+                  The Living Map
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--theme-text-secondary)', lineHeight: 1.6 }}>
-                  Each scenario demonstrates how one human can direct dozens of specialized agents
-                  working in parallel—accomplishing in minutes what would take teams weeks.
+                  Agents appear as luminous orbs in a force-directed topology. Position, size, and brightness
+                  encode state — scroll to zoom between overview and detail levels. Events ripple outward
+                  from their source agents.
                 </p>
               </div>
 

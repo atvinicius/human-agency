@@ -106,3 +106,30 @@ export const lightColors = {
 export function getThemeColors(theme) {
   return theme === 'light' ? lightColors : darkColors;
 }
+
+// Orb-specific helpers for SVG rendering
+
+/**
+ * Get SVG filter ID suffix for an agent's glow.
+ */
+export function getOrbFilterId(role) {
+  return `glow-${role}`;
+}
+
+/**
+ * Get the raw HSL components for building SVG gradients.
+ */
+export function getRoleHSL(role, status) {
+  const hue = statusStyles[status]?.hueOverride ?? roleHues[role] ?? 210;
+  const { saturation, lightness } = statusStyles[status] || statusStyles.working;
+  return { h: hue, s: saturation, l: lightness };
+}
+
+/**
+ * Get edge color based on connection state.
+ */
+export function getEdgeColor(isActive, isHighlighted) {
+  if (isHighlighted) return 'var(--theme-border-active)';
+  if (isActive) return 'var(--theme-accent)';
+  return 'var(--theme-border)';
+}

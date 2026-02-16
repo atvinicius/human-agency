@@ -407,6 +407,45 @@ input:focus {
 }
 
 /* ==================== */
+/* Living Map Animations */
+/* ==================== */
+
+/* Floating annotation fade — drift upward and fade out */
+@keyframes annotationFade {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.6;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+/* SVG orb spawn animation */
+@keyframes orbSpawn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==================== */
 /* Theme Transitions    */
 /* ==================== */
 
