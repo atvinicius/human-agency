@@ -3,38 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, Loader, Play, ArrowLeft, AlertCircle } from 'lucide-react';
 import { parseDataStream, parseAgentResponse } from '../services/streamParser';
 import { useAuthStore } from '../stores/authStore';
-
-// Count agents in a nested config tree
-function countAgents(config) {
-  if (!config) return 0;
-  let count = 1;
-  if (config.children) {
-    for (const child of config.children) {
-      count += countAgents(child);
-    }
-  }
-  return count;
-}
-
-// Build a flat summary of the agent tree for preview
-function flattenTree(config, depth = 0) {
-  if (!config) return [];
-  const items = [{ ...config, depth }];
-  if (config.children) {
-    for (const child of config.children) {
-      items.push(...flattenTree(child, depth + 1));
-    }
-  }
-  return items;
-}
-
-const roleColors = {
-  coordinator: 'hsl(45, 70%, 50%)',
-  researcher: 'hsl(210, 70%, 50%)',
-  executor: 'hsl(150, 70%, 50%)',
-  validator: 'hsl(280, 70%, 50%)',
-  synthesizer: 'hsl(30, 70%, 50%)',
-};
+import { countAgents, flattenTree, roleColors } from '../utils/missionUtils';
 
 export default function CustomMissionInput({ onSelect }) {
   const [objective, setObjective] = useState('');
