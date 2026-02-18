@@ -36,7 +36,7 @@ export default function MapControls({
     <div
       style={{
         position: 'absolute',
-        bottom: '20px',
+        bottom: '68px',
         left: '20px',
         display: 'flex',
         gap: '8px',

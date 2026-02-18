@@ -335,21 +335,7 @@ const FALLBACK_PRESETS = [
 ];
 
 export async function getPresets() {
-  if (!isSupabaseConfigured()) {
-    return FALLBACK_PRESETS;
-  }
-
-  const { data, error } = await supabase
-    .from('presets')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching presets:', error);
-    return FALLBACK_PRESETS;
-  }
-
-  return data;
+  return FALLBACK_PRESETS;
 }
 
 export async function getPresetBySlug(slug) {

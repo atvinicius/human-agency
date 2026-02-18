@@ -3,15 +3,21 @@
 CREATE OR REPLACE FUNCTION grant_beta_credits()
 RETURNS trigger AS $$
 BEGIN
+  -- Insert credits first (independent block so it succeeds even if transaction log fails)
   BEGIN
     INSERT INTO user_credits (user_id, balance, lifetime_earned)
     VALUES (NEW.id, 10.00, 10.00)
     ON CONFLICT (user_id) DO NOTHING;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'grant_beta_credits: user_credits insert failed for user %: %', NEW.id, SQLERRM;
+  END;
 
+  -- Log the transaction separately
+  BEGIN
     INSERT INTO credit_transactions (user_id, amount, type, source, description, balance_after)
     VALUES (NEW.id, 10.00, 'grant', 'beta-welcome', 'Beta tester welcome credits', 10.00);
   EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'grant_beta_credits failed for user %: %', NEW.id, SQLERRM;
+    RAISE WARNING 'grant_beta_credits: credit_transactions insert failed for user %: %', NEW.id, SQLERRM;
   END;
 
   RETURN NEW;

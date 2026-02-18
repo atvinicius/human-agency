@@ -4,6 +4,7 @@ import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap, LogOut, History, FileTex
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAgentStore } from '../stores/agentStore';
 import { useMissionReportStore } from '../stores/missionReportStore';
+import { useCreditStore } from '../stores/creditStore';
 import { MockAgentSimulator } from '../services/mockAgentService';
 import { getOrchestrationService } from '../services/orchestrationService';
 import AgentMap from '../components/map/AgentMap';
@@ -577,9 +578,7 @@ export default function Demo() {
         {showPresetSelector && (
           <PresetSelector
             onSelect={handleSelectPreset}
-            onClose={() => {
-              if (currentPreset) setShowPresetSelector(false);
-            }}
+            onClose={() => setShowPresetSelector(false)}
           />
         )}
       </AnimatePresence>
@@ -630,7 +629,10 @@ export default function Demo() {
         {showBetaWelcome && (
           <BetaWelcome
             userId={authUser?.id}
-            onDismiss={() => setShowBetaWelcome(false)}
+            onDismiss={() => {
+              setShowBetaWelcome(false);
+              useCreditStore.getState().fetchBalance();
+            }}
           />
         )}
       </AnimatePresence>
