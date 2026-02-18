@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 // Extract URLs from text content
 function extractUrls(text) {
@@ -39,6 +40,7 @@ export const useMissionReportStore = create((set, get) => ({
   searchRecords: [],
   synthesis: '',
   status: 'building', // 'building' | 'synthesizing' | 'complete'
+  _realtimeUnsub: null,
 
   addSection: ({
     agentId,
@@ -177,11 +179,99 @@ export const useMissionReportStore = create((set, get) => ({
     return roots;
   },
 
-  reset: () =>
+  /**
+   * Subscribe to Supabase Realtime for report_sections inserts.
+   * Returns an unsubscribe function.
+   */
+  subscribeToSession: (sessionId) => {
+    if (!isSupabaseConfigured() || !sessionId) return () => {};
+
+    const channel = supabase.channel(`report:${sessionId}`);
+
+    channel.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'report_sections', filter: `session_id=eq.${sessionId}` },
+      (payload) => {
+        const section = payload.new;
+
+        if (section.type === 'synthesis') {
+          set({ synthesis: section.content, status: 'complete' });
+        } else {
+          set((state) => ({
+            sections: [
+              ...state.sections,
+              {
+                id: section.id,
+                agentId: section.agent_id,
+                agentName: section.agent_name,
+                role: section.role,
+                title: section.title || section.agent_name,
+                content: section.content,
+                type: section.type,
+                timestamp: new Date(section.created_at).getTime(),
+                tags: autoTag(section.role, section.type),
+                sources: extractUrls(section.content),
+              },
+            ],
+          }));
+        }
+      }
+    );
+
+    channel.subscribe();
+
+    const unsubscribe = () => {
+      supabase.removeChannel(channel);
+    };
+
+    set({ _realtimeUnsub: unsubscribe });
+    return unsubscribe;
+  },
+
+  /**
+   * Load report sections from DB (for reconnection / mission resume).
+   */
+  loadFromDB: async (sessionId) => {
+    if (!isSupabaseConfigured() || !sessionId) return;
+
+    const { data: sections } = await supabase
+      .from('report_sections')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (!sections) return;
+
+    const synthSection = sections.find((s) => s.type === 'synthesis');
+    const otherSections = sections.filter((s) => s.type !== 'synthesis');
+
+    set({
+      sections: otherSections.map((s) => ({
+        id: s.id,
+        agentId: s.agent_id,
+        agentName: s.agent_name,
+        role: s.role,
+        title: s.title || s.agent_name,
+        content: s.content,
+        type: s.type,
+        timestamp: new Date(s.created_at).getTime(),
+        tags: autoTag(s.role, s.type),
+        sources: extractUrls(s.content),
+      })),
+      synthesis: synthSection?.content || '',
+      status: synthSection ? 'complete' : 'building',
+    });
+  },
+
+  reset: () => {
+    const unsub = get()._realtimeUnsub;
+    if (unsub) unsub();
     set({
       sections: [],
       searchRecords: [],
       synthesis: '',
       status: 'building',
-    }),
+      _realtimeUnsub: null,
+    });
+  },
 }));

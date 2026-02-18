@@ -541,6 +541,15 @@ async function executeAgent(agentId, store, orchestrator) {
   }
 }
 
+// Check if server-side orchestration is available
+// When ORCHESTRATE_SECRET is set, pg_cron drives agent iteration via /api/orchestrate
+function isServerSideEnabled() {
+  // Client can't check env vars directly — we detect server-side mode
+  // by checking for a flag set during session creation or from a config endpoint.
+  // For now, server-side mode is opt-in via localStorage or session metadata.
+  return localStorage.getItem('ha_server_orchestration') === 'true';
+}
+
 // Main orchestration class
 export class OrchestrationService {
   constructor() {
@@ -554,6 +563,7 @@ export class OrchestrationService {
     this.missionBudget = { ...DEFAULT_BUDGET };
     this.searchCount = 0;
     this._synthesisTriggered = false;
+    this._serverSide = false;
 
     // Subscribe to store changes
     useAgentStore.subscribe((state) => {
@@ -567,6 +577,7 @@ export class OrchestrationService {
       sessionId: this.sessionId,
       preset: this.currentPreset,
       startTime: this.startTime,
+      serverSide: this._serverSide,
     };
   }
 
@@ -579,6 +590,7 @@ export class OrchestrationService {
     this.missionBudget = { ...DEFAULT_BUDGET };
     this.searchCount = 0;
     this._synthesisTriggered = false;
+    this._serverSide = isServerSideEnabled();
 
     // Reset report store
     useMissionReportStore.getState().reset();
@@ -634,13 +646,66 @@ export class OrchestrationService {
       );
     }
 
-    // Start execution for root agent
-    const rootAgent = this.store.agents.find((a) => !a.parent_id);
-    if (rootAgent) {
-      executeAgent(rootAgent.id, this.store, this);
+    if (this._serverSide && isSupabaseConfigured()) {
+      // Server-side mode: subscribe to Realtime for live updates
+      // pg_cron will pick up the session and iterate agents
+      useAgentStore.getState().subscribeToSession(this.sessionId);
+      useMissionReportStore.getState().subscribeToSession(this.sessionId);
+    } else {
+      // Client-side mode: run executeAgent locally (existing behavior)
+      const rootAgent = this.store.agents.find((a) => !a.parent_id);
+      if (rootAgent) {
+        executeAgent(rootAgent.id, this.store, this);
+      }
     }
 
     return this.sessionId;
+  }
+
+  /**
+   * Resume an existing session from DB.
+   * Loads state, subscribes to Realtime, and reconnects the UI.
+   */
+  async resumeSession(sessionId) {
+    if (!isSupabaseConfigured()) return null;
+
+    // Load session metadata
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    if (!session) return null;
+
+    this.sessionId = sessionId;
+    this.running = ['active', 'synthesizing'].includes(session.status);
+    this.currentPreset = session.metadata?.preset_config || { name: session.name, initial_objective: session.objective };
+    this.startTime = new Date(session.started_at || session.created_at).getTime();
+    this.findingsRegistry = new FindingsRegistry();
+    this.missionBudget = { ...DEFAULT_BUDGET };
+    this._synthesisTriggered = session.status === 'completed';
+    this._serverSide = true; // Resumed sessions always use server-side
+
+    // Load existing state from DB
+    await useAgentStore.getState().loadFromDB(sessionId);
+    await useMissionReportStore.getState().loadFromDB(sessionId);
+
+    // Subscribe to Realtime for live updates
+    if (['active', 'synthesizing'].includes(session.status)) {
+      useAgentStore.getState().subscribeToSession(sessionId);
+      useMissionReportStore.getState().subscribeToSession(sessionId);
+    }
+
+    // If paused, reactivate
+    if (session.status === 'paused') {
+      await supabase.from('sessions').update({ status: 'active' }).eq('id', sessionId);
+      this.running = true;
+      useAgentStore.getState().subscribeToSession(sessionId);
+      useMissionReportStore.getState().subscribeToSession(sessionId);
+    }
+
+    return session;
   }
 
   _checkMissionComplete() {
@@ -837,6 +902,24 @@ Rules:
   }
 
   respondToInput(agentId, response) {
+    if (this._serverSide && isSupabaseConfigured()) {
+      // Server-side mode: call the respond-input API endpoint
+      const token = useAuthStore.getState().getAccessToken();
+      fetch('/api/respond-input', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          agentId,
+          sessionId: this.sessionId,
+          response,
+        }),
+      }).catch((err) => console.error('Failed to send input response:', err));
+    }
+
+    // Update local store immediately for responsive UI
     this.store.updateAgent(agentId, {
       status: 'working',
       pending_input: null,

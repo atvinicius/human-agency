@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Rocket, Clock, Users, ChevronRight, ArrowLeft, FileText } from 'lucide-react';
+import { X, Rocket, Clock, Users, ChevronRight, ArrowLeft, FileText, Play } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { getMissionHistory, getMissionDetails } from '../services/missionHistoryService';
 
@@ -104,7 +104,7 @@ function MissionList({ missions, onSelect, onRelaunch, loading }) {
   );
 }
 
-function MissionDetail({ missionId, onBack, onRelaunch }) {
+function MissionDetail({ missionId, onBack, onRelaunch, onResume }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -229,6 +229,32 @@ function MissionDetail({ missionId, onBack, onRelaunch }) {
         </div>
       )}
 
+      {/* Continue — for active/paused sessions */}
+      {['active', 'paused', 'synthesizing'].includes(session.status) && onResume && (
+        <button
+          onClick={() => onResume(session.id)}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: 'hsl(150, 70%, 50%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '13px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginBottom: '8px',
+          }}
+        >
+          <Play size={14} />
+          Continue Mission
+        </button>
+      )}
+
       {/* Re-launch */}
       {presetConfig && (
         <button
@@ -257,7 +283,7 @@ function MissionDetail({ missionId, onBack, onRelaunch }) {
   );
 }
 
-export default function MissionHistory({ onClose, onRelaunch }) {
+export default function MissionHistory({ onClose, onRelaunch, onResume }) {
   const userId = useAuthStore((s) => s.user?.id);
   const authLoading = useAuthStore((s) => s.loading);
   const [missions, setMissions] = useState([]);
@@ -344,6 +370,7 @@ export default function MissionHistory({ onClose, onRelaunch }) {
             missionId={selectedMissionId}
             onBack={() => setSelectedMissionId(null)}
             onRelaunch={onRelaunch}
+            onResume={onResume}
           />
         ) : (
           <MissionList

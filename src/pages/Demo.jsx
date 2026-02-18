@@ -268,6 +268,31 @@ export default function Demo() {
     handleSelectPreset(preset);
   };
 
+  const handleResumeMission = async (sessionId) => {
+    setShowHistory(false);
+    if (isMissionRunning) {
+      setConfirmAction({ type: 'newMission' });
+      return;
+    }
+
+    reset();
+    useMissionReportStore.getState().reset();
+
+    orchestratorRef.current = getOrchestrationService();
+    const session = await orchestratorRef.current.resumeSession(sessionId);
+    if (session) {
+      const preset = session.metadata?.preset_config || {
+        name: session.name,
+        initial_objective: session.objective,
+        icon: '🚀',
+      };
+      setCurrentPreset(preset);
+      startTimeRef.current = new Date(session.started_at || session.created_at).getTime();
+      setElapsedTime(Date.now() - startTimeRef.current);
+      setShowPresetSelector(false);
+    }
+  };
+
   const handleTogglePause = () => {
     if (isPaused) {
       resumeAll();
@@ -622,6 +647,7 @@ export default function Demo() {
           <MissionHistory
             onClose={() => setShowHistory(false)}
             onRelaunch={handleRelaunch}
+            onResume={handleResumeMission}
           />
         )}
       </AnimatePresence>
