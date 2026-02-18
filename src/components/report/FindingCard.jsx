@@ -10,6 +10,12 @@ const roleBadgeColors = {
   synthesizer: { bg: 'hsla(340, 65%, 50%, 0.15)', text: 'hsl(340, 65%, 60%)' },
 };
 
+const confidenceBadge = {
+  high: { bg: 'hsla(150, 60%, 45%, 0.15)', text: 'hsl(150, 60%, 55%)' },
+  medium: { bg: 'hsla(40, 70%, 50%, 0.15)', text: 'hsl(40, 70%, 55%)' },
+  low: { bg: 'hsla(0, 60%, 50%, 0.15)', text: 'hsl(0, 60%, 55%)' },
+};
+
 export default function FindingCard({ section, parentName }) {
   const [expanded, setExpanded] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
@@ -18,6 +24,8 @@ export default function FindingCard({ section, parentName }) {
   const hasThinking = section.thinking && section.thinking !== 'Processing...';
   const hasSearches = section.searchQueries && section.searchQueries.length > 0;
   const hasSources = section.sources && section.sources.length > 0;
+  const hasConfidence = section.confidence && confidenceBadge[section.confidence];
+  const hasAgentSources = section.agentSources && section.agentSources.length > 0;
 
   // Preview: first 300 chars when collapsed
   const preview = section.content.length > 300 ? section.content.slice(0, 300) + '...' : section.content;
@@ -69,6 +77,21 @@ export default function FindingCard({ section, parentName }) {
         >
           {section.role}
         </span>
+        {hasConfidence && (
+          <span
+            style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              padding: '2px 6px',
+              background: confidenceBadge[section.confidence].bg,
+              color: confidenceBadge[section.confidence].text,
+              borderRadius: '8px',
+              textTransform: 'uppercase',
+            }}
+          >
+            {section.confidence}
+          </span>
+        )}
         {hasThinking && <Brain size={12} style={{ color: 'var(--theme-text-muted)' }} />}
         {hasSearches && <Search size={12} style={{ color: 'var(--theme-text-muted)' }} />}
         {hasSources && (
@@ -185,8 +208,56 @@ export default function FindingCard({ section, parentName }) {
               </div>
             )}
 
-            {/* Source URLs */}
-            {hasSources && (
+            {/* Agent-provided structured sources */}
+            {hasAgentSources && (
+              <div style={{ marginTop: '10px' }}>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: 'var(--theme-text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    marginBottom: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <ExternalLink size={12} />
+                  Sources
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {section.agentSources.slice(0, 8).map((src, i) => (
+                    <div key={i} style={{ fontSize: '11px' }}>
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: 'var(--theme-accent)',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <ExternalLink size={10} style={{ flexShrink: 0 }} />
+                        {src.title || (src.url.length > 55 ? src.url.slice(0, 52) + '...' : src.url)}
+                      </a>
+                      {src.relevant_quote && (
+                        <div style={{ color: 'var(--theme-text-muted)', fontStyle: 'italic', marginTop: '2px', paddingLeft: '14px', fontSize: '11px', lineHeight: 1.4 }}>
+                          "{src.relevant_quote.length > 120 ? src.relevant_quote.slice(0, 117) + '...' : src.relevant_quote}"
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fallback: auto-extracted source URLs (only if no structured sources) */}
+            {!hasAgentSources && hasSources && (
               <div style={{ marginTop: '10px' }}>
                 <div
                   style={{

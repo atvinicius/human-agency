@@ -52,9 +52,16 @@ export const useMissionReportStore = create((set, get) => ({
     searchQueries,
     parentAgentId,
     objective,
+    agentSources,
+    confidence,
+    searchContext,
   }) =>
     set((state) => {
       const contentStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      // Merge agent-provided source URLs with auto-extracted URLs
+      const extractedUrls = extractUrls(contentStr);
+      const agentUrls = (agentSources || []).map((s) => s.url).filter(Boolean);
+      const allUrls = [...new Set([...agentUrls, ...extractedUrls])];
       return {
         sections: [
           ...state.sections,
@@ -72,7 +79,10 @@ export const useMissionReportStore = create((set, get) => ({
             parentAgentId: parentAgentId || null,
             objective: objective || null,
             tags: autoTag(role, type),
-            sources: extractUrls(contentStr),
+            sources: allUrls,
+            agentSources: agentSources || [],
+            confidence: confidence || null,
+            searchContext: searchContext || [],
           },
         ],
       };
@@ -93,9 +103,10 @@ export const useMissionReportStore = create((set, get) => ({
       ],
     })),
 
-  setSynthesis: (text) =>
+  // Accepts a string (legacy) or structured object { executive_summary, key_findings, detailed_analysis, methodology, sources }
+  setSynthesis: (data) =>
     set({
-      synthesis: text,
+      synthesis: typeof data === 'string' ? data : data,
       status: 'complete',
     }),
 

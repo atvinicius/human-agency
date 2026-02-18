@@ -340,6 +340,9 @@ async function executeAgent(agentId, store, orchestrator) {
           searchQueries: result.searches || [],
           parentAgentId: currentAgent.parent_id || null,
           objective: currentAgent.objective || null,
+          agentSources: result.sources || [],
+          confidence: result.confidence || null,
+          searchContext: result.search_context || [],
         });
       }
 
@@ -671,13 +674,20 @@ export class OrchestrationService {
       }
     }
 
-    // Gather all completions
+    // Gather enriched agent outputs with objectives and roles
+    const reportStore = useMissionReportStore.getState();
+    const sourceMap = reportStore.getSourceMap();
+    const searchRecords = reportStore.searchRecords;
+    const validationSections = reportStore.sections.filter((s) => s.tags?.includes('validation'));
+
     const allOutputs = completedAgents
       .map((a) => {
         const completion = this.findingsRegistry?.completions[a.id];
-        return completion
-          ? `## ${a.name} (${a.role})\n${completion.output}`
-          : null;
+        if (!completion) return null;
+        let block = `## ${a.name} (${a.role})`;
+        if (a.objective) block += `\nObjective: ${a.objective}`;
+        block += `\n${completion.output}`;
+        return block;
       })
       .filter(Boolean)
       .join('\n\n---\n\n');
@@ -687,12 +697,28 @@ export class OrchestrationService {
       return;
     }
 
-    // Try LLM synthesis call
+    // Build source context for synthesis
+    const sourceEntries = Object.values(sourceMap);
+    const sourcesContext = sourceEntries.length > 0
+      ? `\n\nSources referenced by agents:\n${sourceEntries.slice(0, 30).map((s, i) => `[${i + 1}] ${s.url} (cited by: ${s.citedBy.map((c) => c.agentName).join(', ')})`).join('\n')}`
+      : '';
+
+    // Build validation context
+    const validationContext = validationSections.length > 0
+      ? `\n\nValidation results:\n${validationSections.map((v) => `- ${v.agentName}: ${v.content.slice(0, 300)}`).join('\n')}`
+      : '';
+
+    // Build search context
+    const searchContext = searchRecords.length > 0
+      ? `\n\nSearches performed (${searchRecords.length} total):\n${searchRecords.slice(0, 15).map((s) => `- "${s.query}" by ${s.agentName} (${s.resultCount} results)`).join('\n')}`
+      : '';
+
+    // Try LLM synthesis call with structured output request
     try {
       const synthAgent = {
         role: 'synthesizer',
         name: 'Final Synthesizer',
-        objective: `Synthesize all agent findings into a comprehensive, well-structured markdown report for: ${this.currentPreset?.initial_objective || 'the mission objective'}`,
+        objective: `Synthesize all agent findings into a structured report for: ${this.currentPreset?.initial_objective || 'the mission objective'}`,
         model: 'moonshotai/kimi-k2',
         context: {},
       };
@@ -700,7 +726,24 @@ export class OrchestrationService {
       const synthMessages = [
         {
           role: 'user',
-          content: `Here are the findings from all agents:\n\n${allOutputs.slice(0, 8000)}\n\nSynthesize these into a comprehensive, well-structured markdown report. Include key findings, analysis, and conclusions. Output ONLY the markdown report text, no JSON wrapper.`,
+          content: `Here are the findings from all agents:\n\n${allOutputs.slice(0, 7000)}${sourcesContext}${validationContext}${searchContext}
+
+Synthesize these into a structured JSON report. Respond with ONLY a JSON object (no markdown wrapper) with this structure:
+{
+  "executive_summary": "2-3 paragraph high-level summary",
+  "key_findings": [
+    { "finding": "description", "sources": ["url1", "url2"], "confidence": "high|medium|low" }
+  ],
+  "detailed_analysis": "Full markdown analysis with inline citations like [Source: URL]",
+  "methodology": "Brief description of how agents approached the research",
+  "sources": [{ "url": "...", "title": "..." }]
+}
+
+Rules:
+- Include inline citations [Source: URL] in detailed_analysis when referencing specific information
+- Set confidence based on source quality and corroboration across agents
+- List all referenced URLs in the sources array
+- If you cannot produce valid JSON, output a plain markdown report instead`,
         },
       ];
 
@@ -712,11 +755,42 @@ export class OrchestrationService {
 
       if (response.ok) {
         const fullText = await parseDataStream(response, () => {});
-        // Use the raw text if it doesn't look like JSON
-        const synthesisText = fullText.trim().startsWith('{')
-          ? (parseAgentResponse(fullText).output || fullText)
-          : fullText;
-        useMissionReportStore.getState().setSynthesis(synthesisText);
+        const trimmed = fullText.trim();
+
+        // Try to parse as structured JSON
+        let structured = null;
+        const jsonCandidate = trimmed.startsWith('{') ? trimmed : null;
+        if (jsonCandidate) {
+          try {
+            const parsed = JSON.parse(jsonCandidate);
+            if (parsed.executive_summary || parsed.key_findings) {
+              structured = parsed;
+            }
+          } catch {
+            // Try extracting JSON from agent response wrapper
+            try {
+              const agentResult = parseAgentResponse(trimmed);
+              if (typeof agentResult.output === 'object' && agentResult.output?.executive_summary) {
+                structured = agentResult.output;
+              } else if (typeof agentResult.output === 'string') {
+                try {
+                  const inner = JSON.parse(agentResult.output);
+                  if (inner.executive_summary || inner.key_findings) structured = inner;
+                } catch { /* not JSON */ }
+              }
+            } catch { /* not parseable */ }
+          }
+        }
+
+        if (structured) {
+          useMissionReportStore.getState().setSynthesis(structured);
+        } else {
+          // Fallback: use as plain text
+          const synthesisText = trimmed.startsWith('{')
+            ? (parseAgentResponse(trimmed).output || trimmed)
+            : trimmed;
+          useMissionReportStore.getState().setSynthesis(synthesisText);
+        }
       } else {
         // Fallback: concatenated output
         useMissionReportStore.getState().setSynthesis(allOutputs);

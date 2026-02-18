@@ -144,6 +144,9 @@ Respond with a JSON object containing:
 - "activity": What you're currently doing (short string for UI display)
 - "progress_delta": How much progress this represents (0-20)
 - "output": Your actual work output (string or object)
+- "sources": Array of sources referenced (optional), each with {url, title, relevant_quote} — include URLs from search results you relied on
+- "confidence": Self-assessed confidence in your output: "high", "medium", or "low" (optional)
+- "search_context": Array of search context (optional), each with {query, key_results: [{title, url}]} — link your searches to their key results
 - "spawn_agents": Array of agents to spawn (optional), each with {role, name, objective}
 - "needs_input": If you need human input, {type: "approval"|"choice"|"text", title, message, options?}
 - "complete": Boolean, true if objective is fully accomplished

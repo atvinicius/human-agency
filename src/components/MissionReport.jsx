@@ -31,6 +31,28 @@ const statusLabels = {
 
 const roleOrder = ['coordinator', 'researcher', 'executor', 'validator', 'synthesizer'];
 
+// Convert structured or string synthesis to plain text
+function synthesisAsText(synthesis) {
+  if (!synthesis) return '';
+  if (typeof synthesis === 'string') return synthesis;
+  const parts = [];
+  if (synthesis.executive_summary) parts.push(`## Executive Summary\n${synthesis.executive_summary}`);
+  if (synthesis.key_findings?.length) {
+    parts.push(`## Key Findings\n${synthesis.key_findings.map((kf, i) => {
+      let line = `${i + 1}. ${kf.finding}`;
+      if (kf.confidence) line += ` [${kf.confidence} confidence]`;
+      if (kf.sources?.length) line += `\n   Sources: ${kf.sources.join(', ')}`;
+      return line;
+    }).join('\n')}`);
+  }
+  if (synthesis.detailed_analysis) parts.push(`## Detailed Analysis\n${synthesis.detailed_analysis}`);
+  if (synthesis.methodology) parts.push(`## Methodology\n${synthesis.methodology}`);
+  if (synthesis.sources?.length) {
+    parts.push(`## Sources\n${synthesis.sources.map((s) => `- ${s.title || s.url}: ${s.url}`).join('\n')}`);
+  }
+  return parts.join('\n\n');
+}
+
 // Build structured JSON export
 function buildExportJson(sections, searchRecords, synthesis, sourceMap) {
   return {
@@ -71,6 +93,28 @@ function buildExportHtml(sections, synthesis, sourceMap) {
     })
     .join('\n');
 
+  // Build synthesis HTML — handle structured or string
+  let synthesisHtml = '';
+  if (synthesis && typeof synthesis === 'object' && synthesis.executive_summary) {
+    synthesisHtml += `<h2>Executive Summary</h2><div class="content">${synthesis.executive_summary.replace(/\n/g, '<br>')}</div>`;
+    if (synthesis.key_findings?.length) {
+      synthesisHtml += '<h2>Key Findings</h2>';
+      for (const kf of synthesis.key_findings) {
+        const conf = kf.confidence ? ` <span class="conf-${kf.confidence}">[${kf.confidence}]</span>` : '';
+        const srcs = kf.sources?.length ? `<div class="kf-sources">${kf.sources.map((s) => `<a href="${s}">${s}</a>`).join(' ')}</div>` : '';
+        synthesisHtml += `<div class="finding"><p>${kf.finding}${conf}</p>${srcs}</div>`;
+      }
+    }
+    if (synthesis.detailed_analysis) {
+      synthesisHtml += `<h2>Detailed Analysis</h2><div class="content">${synthesis.detailed_analysis.replace(/\n/g, '<br>')}</div>`;
+    }
+    if (synthesis.methodology) {
+      synthesisHtml += `<h2>Methodology</h2><div class="content">${synthesis.methodology.replace(/\n/g, '<br>')}</div>`;
+    }
+  } else if (synthesis) {
+    synthesisHtml = `<h2>Synthesis</h2><div class="content">${String(synthesis).replace(/\n/g, '<br>')}</div>`;
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,6 +127,11 @@ function buildExportHtml(sections, synthesis, sourceMap) {
   h2 { color: #8ab4f8; margin-top: 32px; }
   h3 { margin: 0 0 8px; font-size: 15px; }
   .badge { font-size: 10px; padding: 2px 8px; border-radius: 8px; background: rgba(138,180,248,0.15); color: #8ab4f8; text-transform: uppercase; font-weight: 600; }
+  .conf-high { color: #66bb6a; font-size: 11px; }
+  .conf-medium { color: #ffa726; font-size: 11px; }
+  .conf-low { color: #ef5350; font-size: 11px; }
+  .kf-sources { margin-top: 4px; font-size: 12px; }
+  .kf-sources a { margin-right: 8px; }
   .finding { background: #1e1e32; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
   .content { font-size: 14px; line-height: 1.7; color: #c0c0c0; }
   .thinking { font-size: 13px; color: #888; border-left: 2px solid #444; padding-left: 12px; }
@@ -96,7 +145,7 @@ function buildExportHtml(sections, synthesis, sourceMap) {
 </head>
 <body>
 <h1>Mission Report</h1>
-${synthesis ? `<h2>Synthesis</h2><div class="content">${synthesis.replace(/\n/g, '<br>')}</div>` : ''}
+${synthesisHtml}
 <h2>Findings</h2>
 ${findingsHtml}
 ${sourcesHtml ? `<h2>Sources</h2><ul>${sourcesHtml}</ul>` : ''}
@@ -139,7 +188,7 @@ export default function MissionReport({ onClose }) {
   const sourceCount = Object.keys(sourceMap).length;
 
   const handleCopySynthesis = async () => {
-    const text = synthesis || sections.map((s) => `## ${s.agentName}\n${s.content}`).join('\n\n');
+    const text = synthesisAsText(synthesis) || sections.map((s) => `## ${s.agentName}\n${s.content}`).join('\n\n');
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -301,7 +350,9 @@ export default function MissionReport({ onClose }) {
         {/* Summary tab */}
         {activeTab === 'summary' && (
           <>
-            {synthesis && (
+            {synthesis && typeof synthesis === 'object' && synthesis.executive_summary ? (
+              <StructuredSynthesis synthesis={synthesis} />
+            ) : synthesis ? (
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--theme-accent)', marginBottom: '8px', fontWeight: 600 }}>
                   Synthesized Report
@@ -310,7 +361,7 @@ export default function MissionReport({ onClose }) {
                   {renderMarkdown(synthesis)}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Quick stats */}
             {(outputSections.length > 0 || searchRecords.length > 0) && (
@@ -518,7 +569,7 @@ export default function MissionReport({ onClose }) {
                 label="Copy synthesis only"
                 sub="Text"
                 onClick={() => {
-                  navigator.clipboard.writeText(synthesis || '');
+                  navigator.clipboard.writeText(synthesisAsText(synthesis) || '');
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                   setExportMenu(false);
@@ -568,6 +619,159 @@ function StatChip({ label, value, color }) {
     >
       <span style={{ fontSize: '14px', fontWeight: 600, color }}>{value}</span>
       <span style={{ fontSize: '11px', color: 'var(--theme-text-muted)' }}>{label}</span>
+    </div>
+  );
+}
+
+// Confidence badge colors
+const confidenceColors = {
+  high: { bg: 'hsla(150, 60%, 45%, 0.15)', text: 'hsl(150, 60%, 55%)' },
+  medium: { bg: 'hsla(40, 70%, 50%, 0.15)', text: 'hsl(40, 70%, 55%)' },
+  low: { bg: 'hsla(0, 60%, 50%, 0.15)', text: 'hsl(0, 60%, 55%)' },
+};
+
+// Structured synthesis renderer
+function StructuredSynthesis({ synthesis }) {
+  return (
+    <div style={{ marginBottom: '24px' }}>
+      {/* Executive Summary */}
+      {synthesis.executive_summary && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--theme-accent)', marginBottom: '8px', fontWeight: 600 }}>
+            Executive Summary
+          </div>
+          <div style={{ background: 'var(--theme-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--theme-border)' }}>
+            {renderMarkdown(synthesis.executive_summary)}
+          </div>
+        </div>
+      )}
+
+      {/* Key Findings */}
+      {synthesis.key_findings && synthesis.key_findings.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--theme-accent)', marginBottom: '8px', fontWeight: 600 }}>
+            Key Findings ({synthesis.key_findings.length})
+          </div>
+          {synthesis.key_findings.map((kf, i) => {
+            const conf = confidenceColors[kf.confidence] || confidenceColors.medium;
+            return (
+              <div
+                key={i}
+                style={{
+                  background: 'var(--theme-bg)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '8px',
+                  border: '1px solid var(--theme-border)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--theme-text-primary)', flex: 1 }}>
+                    {renderMarkdown(kf.finding)}
+                  </span>
+                  {kf.confidence && (
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        padding: '2px 7px',
+                        background: conf.bg,
+                        color: conf.text,
+                        borderRadius: '8px',
+                        textTransform: 'uppercase',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {kf.confidence}
+                    </span>
+                  )}
+                </div>
+                {kf.sources && kf.sources.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                    {kf.sources.map((src, j) => (
+                      <a
+                        key={j}
+                        href={src}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          background: 'hsla(210, 70%, 50%, 0.1)',
+                          color: 'hsl(210, 70%, 60%)',
+                          borderRadius: '6px',
+                          textDecoration: 'none',
+                          maxWidth: '200px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {src.length > 40 ? src.slice(0, 37) + '...' : src}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Detailed Analysis */}
+      {synthesis.detailed_analysis && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--theme-accent)', marginBottom: '8px', fontWeight: 600 }}>
+            Detailed Analysis
+          </div>
+          <div style={{ background: 'var(--theme-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--theme-border)' }}>
+            {renderMarkdown(synthesis.detailed_analysis)}
+          </div>
+        </div>
+      )}
+
+      {/* Methodology */}
+      {synthesis.methodology && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--theme-text-muted)', marginBottom: '8px', fontWeight: 600 }}>
+            Methodology
+          </div>
+          <div style={{ background: 'var(--theme-bg)', borderRadius: '8px', padding: '12px 14px', border: '1px solid var(--theme-border)', fontSize: '12px', color: 'var(--theme-text-secondary)', lineHeight: 1.6 }}>
+            {renderMarkdown(synthesis.methodology)}
+          </div>
+        </div>
+      )}
+
+      {/* Synthesis Sources */}
+      {synthesis.sources && synthesis.sources.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--theme-text-muted)', marginBottom: '8px', fontWeight: 600 }}>
+            Cited Sources ({synthesis.sources.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {synthesis.sources.map((src, i) => (
+              <a
+                key={i}
+                href={src.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--theme-accent)',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <ExternalLink size={11} style={{ flexShrink: 0 }} />
+                {src.title || src.url}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
