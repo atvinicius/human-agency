@@ -2,7 +2,7 @@
 
 **Mission Control for the AI Age** — one human directing a swarm of AI agents in real time.
 
-[Live Demo](https://human-agency.vercel.app) &middot; [Manifesto](MANIFESTO.md) &middot; [Development Plan](PLAN.md)
+[Live Demo](https://humanagency.io) &middot; [Manifesto](MANIFESTO.md) &middot; [Development Plan](PLAN.md)
 
 ---
 
