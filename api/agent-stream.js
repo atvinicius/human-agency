@@ -5,8 +5,10 @@
 import { streamText, tool } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { z } from 'zod';
+import { getCorsHeaders } from './_config/cors.js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
-import { checkCredits, deductCredits } from './_middleware/credits.js';
+import { checkCredits, deductCredits, deductSearchCosts } from './_middleware/credits.js';
+import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
 import { webSearch } from './search.js';
 
 export const config = {
@@ -63,11 +65,7 @@ Focus on clarity and actionability. Make complex information accessible.`,
 };
 
 export default async function handler(req) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -87,15 +85,26 @@ export default async function handler(req) {
     });
   }
 
-  // Authenticate request (if Supabase auth is configured)
+  // Authenticate request — require auth when running with billing enabled
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const authConfigured = !!(SUPABASE_URL && SUPABASE_SERVICE_KEY);
   const authUser = await authenticateRequest(req);
-  if (SUPABASE_URL && SUPABASE_SERVICE_KEY && !authUser) {
+
+  // Fail-fast: if billing infra is partially configured, refuse to serve unauthenticated.
+  // This prevents silently giving away free API calls when env vars are misconfigured.
+  if (!authUser && (authConfigured || OPENROUTER_API_KEY)) {
     return unauthorizedResponse(corsHeaders);
   }
 
   try {
+    // Rate limit per user (or IP for unauthenticated)
+    const rateLimitKey = authUser?.id || req.headers.get('x-forwarded-for') || 'anon';
+    const rateCheck = checkRateLimit(rateLimitKey, 'agent');
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs, corsHeaders);
+    }
+
     const { agent, messages, sessionId } = await req.json();
 
     // Credit check before making LLM call
@@ -187,12 +196,46 @@ Respond with a JSON object containing:
         // Deduct credits after stream completes
         if (authUser && usage) {
           const modelId = agent.model || 'moonshotai/kimi-k2';
-          await deductCredits(
-            authUser.id, modelId,
-            usage.promptTokens || 0,
-            usage.completionTokens || 0,
-            sessionId || null
-          );
+          try {
+            const result = await deductCredits(
+              authUser.id, modelId,
+              usage.promptTokens || 0,
+              usage.completionTokens || 0,
+              sessionId || null
+            );
+            if (result && !result.success) {
+              console.error('[billing] Deduction rejected:', result.error, {
+                userId: authUser.id, modelId,
+                tokens: { prompt: usage.promptTokens, completion: usage.completionTokens },
+              });
+            }
+          } catch (err) {
+            // Critical: tokens were consumed but credits not deducted.
+            // Log enough context for manual reconciliation.
+            console.error('[billing] Deduction FAILED — needs reconciliation:', {
+              error: err.message,
+              userId: authUser.id,
+              modelId,
+              promptTokens: usage.promptTokens || 0,
+              completionTokens: usage.completionTokens || 0,
+              sessionId: sessionId || null,
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Deduct search costs separately (if any searches were performed)
+          if (searchCount > 0) {
+            try {
+              await deductSearchCosts(authUser.id, searchCount, sessionId || null);
+            } catch (searchErr) {
+              console.error('[billing] Search deduction FAILED:', {
+                error: searchErr.message,
+                userId: authUser.id,
+                searchCount,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          }
         }
       },
     });

@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { getCorsHeaders } from './_config/cors.js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
+import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
 
 export const config = {
   runtime: 'edge',
@@ -15,11 +17,7 @@ const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_KEY
   : null;
 
 export default async function handler(req) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -37,6 +35,13 @@ export default async function handler(req) {
     });
   }
 
+  // Rate limit — tighter for promo redemption, looser for balance check
+  const rlCategory = req.method === 'POST' ? 'promo' : 'credits';
+  const rateCheck = checkRateLimit(authUser.id, rlCategory);
+  if (!rateCheck.allowed) {
+    return rateLimitResponse(rateCheck.retryAfterMs, corsHeaders);
+  }
+
   // GET — return user balance
   if (req.method === 'GET') {
     const { data, error } = await supabaseAdmin
@@ -46,19 +51,9 @@ export default async function handler(req) {
       .single();
 
     if (error || !data) {
-      // No credit row — grant beta credits on first read
-      const { data: newData } = await supabaseAdmin
-        .from('user_credits')
-        .upsert({
-          user_id: authUser.id,
-          balance: 10.0,
-          lifetime_earned: 10.0,
-          lifetime_spent: 0,
-        }, { onConflict: 'user_id', ignoreDuplicates: true })
-        .select('balance, lifetime_earned, lifetime_spent')
-        .single();
-
-      return new Response(JSON.stringify(newData || { balance: 10, lifetime_earned: 10, lifetime_spent: 0 }), {
+      // No credit row — DB trigger should have created one on signup.
+      // Return zero balance instead of auto-granting (single granting path = DB trigger).
+      return new Response(JSON.stringify({ balance: 0, lifetime_earned: 0, lifetime_spent: 0 }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

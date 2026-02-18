@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { calculateCost, RATE_LIMITS } from '../_config/pricing.js';
+import { calculateCost, SEARCH_PRICING, PLATFORM_MARKUP, RATE_LIMITS } from '../_config/pricing.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -24,17 +24,10 @@ export async function checkCredits(userId) {
     .single();
 
   if (error || !data) {
-    // No credit row — grant beta credits on first read
-    await supabaseAdmin
-      .from('user_credits')
-      .upsert({
-        user_id: userId,
-        balance: 10.0,
-        lifetime_earned: 10.0,
-        lifetime_spent: 0,
-      }, { onConflict: 'user_id', ignoreDuplicates: true });
-
-    return { allowed: true, balance: 10.0 };
+    // No credit row — DB trigger should have created one on signup.
+    // Don't auto-grant here to avoid multiple granting paths.
+    console.warn('[credits] No credit record for user', userId, '— trigger may have failed');
+    return { allowed: false, balance: 0 };
   }
 
   return {
@@ -68,4 +61,32 @@ export async function deductCredits(userId, modelId, promptTokens, completionTok
   }
 
   return data; // { success, balance, cost } or { success: false, error }
+}
+
+/**
+ * Deduct credits for web search usage.
+ * Applies platform markup to the per-search cost.
+ */
+export async function deductSearchCosts(userId, searchCount, sessionId = null) {
+  if (!supabaseAdmin || !userId || searchCount <= 0) return null;
+
+  const cost = Math.round(searchCount * SEARCH_PRICING.cost_per_search * PLATFORM_MARKUP * 10000) / 10000;
+  if (cost <= 0) return null;
+
+  const { data, error } = await supabaseAdmin.rpc('deduct_credits', {
+    p_user_id: userId,
+    p_amount: cost,
+    p_model_id: null,
+    p_prompt_tokens: null,
+    p_completion_tokens: null,
+    p_session_id: sessionId,
+    p_description: `${searchCount} web search(es)`,
+  });
+
+  if (error) {
+    console.error('Failed to deduct search credits:', error);
+    return null;
+  }
+
+  return data;
 }

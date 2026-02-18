@@ -3,8 +3,10 @@
 
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { getCorsHeaders } from './_config/cors.js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
 import { checkCredits, deductCredits } from './_middleware/credits.js';
+import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
 
 export const config = {
   runtime: 'edge',
@@ -61,11 +63,7 @@ Guidelines:
 - Maximum tree depth of 3 levels (root coordinator → specialists → sub-specialists)`;
 
 export default async function handler(req) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -85,15 +83,22 @@ export default async function handler(req) {
     });
   }
 
-  // Authenticate request (if Supabase auth is configured)
+  // Authenticate request — require auth when running with billing enabled
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   const authUser = await authenticateRequest(req);
-  if (SUPABASE_URL && SUPABASE_SERVICE_KEY && !authUser) {
+  if (!authUser && ((SUPABASE_URL && SUPABASE_SERVICE_KEY) || OPENROUTER_API_KEY)) {
     return unauthorizedResponse(corsHeaders);
   }
 
   try {
+    // Rate limit per user (or IP for unauthenticated)
+    const rateLimitKey = authUser?.id || req.headers.get('x-forwarded-for') || 'anon';
+    const rateCheck = checkRateLimit(rateLimitKey, 'agent');
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs, corsHeaders);
+    }
+
     const { objective } = await req.json();
 
     if (!objective?.trim()) {
@@ -132,11 +137,27 @@ export default async function handler(req) {
       maxTokens: 3000,
       onFinish: async ({ usage }) => {
         if (authUser && usage) {
-          await deductCredits(
-            authUser.id, 'moonshotai/kimi-k2',
-            usage.promptTokens || 0,
-            usage.completionTokens || 0
-          );
+          try {
+            const result = await deductCredits(
+              authUser.id, 'moonshotai/kimi-k2',
+              usage.promptTokens || 0,
+              usage.completionTokens || 0
+            );
+            if (result && !result.success) {
+              console.error('[billing] Plan deduction rejected:', result.error, {
+                userId: authUser.id,
+                tokens: { prompt: usage.promptTokens, completion: usage.completionTokens },
+              });
+            }
+          } catch (err) {
+            console.error('[billing] Plan deduction FAILED — needs reconciliation:', {
+              error: err.message,
+              userId: authUser.id,
+              promptTokens: usage.promptTokens || 0,
+              completionTokens: usage.completionTokens || 0,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       },
     });

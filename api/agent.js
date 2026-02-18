@@ -2,8 +2,10 @@
 // This runs server-side, keeping API keys secure
 
 import { createClient } from '@supabase/supabase-js';
+import { getCorsHeaders } from './_config/cors.js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
 import { checkCredits, deductCredits } from './_middleware/credits.js';
+import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
 import { calculateCost } from './_config/pricing.js';
 
 export const config = {
@@ -142,11 +144,7 @@ async function saveArtifact(artifact, agentId, sessionId) {
 
 export default async function handler(req) {
   // CORS headers for frontend
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -166,13 +164,20 @@ export default async function handler(req) {
     });
   }
 
-  // Authenticate request (if Supabase auth is configured)
+  // Authenticate request — require auth when running with billing enabled
   const authUser = await authenticateRequest(req);
-  if (SUPABASE_URL && SUPABASE_SERVICE_KEY && !authUser) {
+  if (!authUser && ((SUPABASE_URL && SUPABASE_SERVICE_KEY) || OPENROUTER_API_KEY)) {
     return unauthorizedResponse(corsHeaders);
   }
 
   try {
+    // Rate limit per user (or IP for unauthenticated)
+    const rateLimitKey = authUser?.id || req.headers.get('x-forwarded-for') || 'anon';
+    const rateCheck = checkRateLimit(rateLimitKey, 'agent');
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs, corsHeaders);
+    }
+
     const body = await req.json();
     const { agent, messages, sessionId } = body;
 
