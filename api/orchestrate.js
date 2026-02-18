@@ -46,7 +46,9 @@ export default async function handler(req, res) {
       .in('status', ['active', 'synthesizing']);
 
     if (error || !sessions || sessions.length === 0) {
-      return res.status(200).json({ action: 'idle', sessions: 0 });
+      // No active sessions — disable the cron job to save invocations
+      await supabase.rpc('disable_orchestration');
+      return res.status(200).json({ action: 'idle', sessions: 0, cron: 'disabled' });
     }
 
     const results = [];

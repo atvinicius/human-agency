@@ -544,10 +544,10 @@ async function executeAgent(agentId, store, orchestrator) {
 // Check if server-side orchestration is available
 // When ORCHESTRATE_SECRET is set, pg_cron drives agent iteration via /api/orchestrate
 function isServerSideEnabled() {
-  // Client can't check env vars directly — we detect server-side mode
-  // by checking for a flag set during session creation or from a config endpoint.
-  // For now, server-side mode is opt-in via localStorage or session metadata.
-  return localStorage.getItem('ha_server_orchestration') === 'true';
+  // Server-side orchestration is the default when Supabase is configured.
+  // Can be disabled via localStorage for debugging: localStorage.setItem('ha_server_orchestration', 'false')
+  if (localStorage.getItem('ha_server_orchestration') === 'false') return false;
+  return isSupabaseConfigured();
 }
 
 // Main orchestration class
@@ -647,8 +647,10 @@ export class OrchestrationService {
     }
 
     if (this._serverSide && isSupabaseConfigured()) {
-      // Server-side mode: subscribe to Realtime for live updates
-      // pg_cron will pick up the session and iterate agents
+      // Server-side mode: enable pg_cron job, subscribe to Realtime for live updates
+      supabase.rpc('enable_orchestration').then(({ error }) => {
+        if (error) console.warn('Failed to enable orchestration cron:', error.message);
+      });
       useAgentStore.getState().subscribeToSession(this.sessionId);
       useMissionReportStore.getState().subscribeToSession(this.sessionId);
     } else {
