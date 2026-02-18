@@ -676,34 +676,44 @@ export default function Demo() {
                 className="font-serif"
                 style={{ fontSize: '24px', color: 'var(--theme-text-primary)', marginBottom: '16px' }}
               >
-                About This Demo
+                About This Project
               </h2>
               <p style={{ fontSize: '14px', color: 'var(--theme-text-secondary)', lineHeight: 1.7, marginBottom: '20px' }}>
-                This is a live simulation of the Human Agency orchestration layer. Watch as AI agents
-                spawn, work in parallel, and complete complex tasks that would typically require
-                entire teams.
+                Human Agency is a research orchestration platform. Launch a mission and watch as a team of
+                AI agents — researchers, validators, and synthesizers — work in parallel to investigate
+                complex topics. Agents search the web, share findings, and converge into a structured report.
               </p>
+
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '13px', color: 'var(--theme-text-primary)', marginBottom: '12px' }}>
+                  How It Works
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--theme-text-secondary)', lineHeight: 1.6 }}>
+                  Each mission spawns a coordinator that delegates to specialized agents. Researchers search the
+                  web and share findings with siblings to avoid duplication. A validator cross-checks claims,
+                  and a synthesizer compiles everything into a final report you can copy or download.
+                </p>
+              </div>
 
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '13px', color: 'var(--theme-text-primary)', marginBottom: '12px' }}>
                   The Living Map
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--theme-text-secondary)', lineHeight: 1.6 }}>
-                  Agents appear as luminous orbs in a force-directed topology. Position, size, and brightness
-                  encode state — scroll to zoom between overview and detail levels. Events ripple outward
-                  from their source agents.
+                  Agents appear as luminous orbs in a force-directed layout. Scroll to zoom, click to inspect.
+                  Colored particles flowing along edges show data moving between agents — findings, context,
+                  search results, and synthesis. A pulsing ring means an agent is searching the web.
                 </p>
               </div>
 
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '13px', color: 'var(--theme-text-primary)', marginBottom: '12px' }}>
-                  Color Legend:
+                  Agent Roles
                 </h3>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                   {[
                     { role: 'coordinator', label: 'Coordinator' },
                     { role: 'researcher', label: 'Researcher' },
-                    { role: 'executor', label: 'Executor' },
                     { role: 'validator', label: 'Validator' },
                     { role: 'synthesizer', label: 'Synthesizer' },
                   ].map(({ role, label }) => (

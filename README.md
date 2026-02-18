@@ -8,33 +8,52 @@
 
 ## What It Does
 
-Human Agency is an orchestration platform where a single operator launches, monitors, and steers dozens of AI agents working in parallel. Instead of chat, the interface is a **live map** that grows as agents spawn, branch, and complete objectives.
+Human Agency is a research orchestration platform where a single operator launches deep investigative missions powered by teams of AI agents. Instead of chat, the interface is a **living map** — agents appear as luminous orbs that spawn, branch, search the web, share findings, and converge into a structured report.
 
-- **Custom missions** — describe any objective; an AI planner decomposes it into a team of specialized agents (coordinator, researcher, executor, validator, synthesizer)
-- **Real-time visualization** — D3-powered agent map with pan/zoom, color-coded by role and status
-- **Human-in-the-loop** — agents surface decisions for operator approval; pause, resume, or redirect at any point
-- **Streaming execution** — watch agents think in real time via Server-Sent Events
-- **Priority queue** — concurrent LLM calls with priority ordering, rate-limit handling, and context compression
+### Research Missions
+
+Choose from 5 deep-dive research presets or describe your own objective:
+
+- **The Longevity Equation** — anti-aging science, senolytics, GLP-1 repurposing, AI drug discovery
+- **The Critical Minerals Chess Match** — geopolitics of rare earths, supply chain mapping, Western response
+- **The Deepfake Reckoning** — synthetic media fraud, detection arms race, regulatory gaps
+- **The Abyss Catalog** — deep-ocean biodiversity vs. mining, ISA regulatory battles
+- **The Machine Consciousness Problem** — philosophy of mind meets AI architecture
+
+Each mission spawns 9–11 specialized agents (researchers, validators, synthesizers) coordinated by an AI director. Agents search the web, share findings with siblings, and produce a consolidated report.
+
+### Key Capabilities
+
+- **Multi-agent orchestration** — coordinators, researchers, validators, and synthesizers working in parallel with smart spawn limits (25 agents, depth 4)
+- **Live web search** — agents query the web in real time via Serper, Brave, or Tavily
+- **Inter-agent collaboration** — shared findings registry, parent-child context passing, sibling awareness to prevent duplication
+- **Real-time visualization** — D3-powered force-directed map with role-colored orbs, directional data flow particles, and search indicators
+- **Consolidated output** — auto-synthesized mission report with copy/download, organized by Report/Artifacts/Raw Findings
+- **Human-in-the-loop** — pause, resume, or redirect agents at any point; agents surface decisions for operator approval
+- **Custom missions** — describe any objective and an AI planner decomposes it into a specialized agent team
+- **Credits system** — new users get $10 in beta credits to run missions immediately
 
 ## Architecture
 
 ```
-Operator → Landing → /demo → Mission Control
-                                  │
-                      ┌───────────┴───────────┐
-                PresetSelector         CustomMissionInput
-                      │                        │
-              OrchestrationService    /api/plan-mission (streaming)
-                ┌─────┴─────┐                  │
-          RequestQueue   AgentStore     Agent tree preview → Launch
-               │          (Zustand)
-        /api/agent-stream (SSE)
-               │
-        OpenRouter → Kimi K2
-               │
-        ContextCompressor (every 3 iterations)
-               │
-        AgentMap (D3) + ActivityStream
+User → Landing → /demo → Mission Control
+                              │
+                  ┌───────────┴───────────┐
+            PresetSelector         CustomMissionInput
+                  │                        │
+          OrchestrationService    /api/plan-mission (streaming)
+            ↓       ↓       ↓              │
+      RequestQueue  AgentStore  FindingsRegistry  Agent tree → Launch
+           ↓        (Zustand)   (per-session)
+    /api/agent-stream (SSE + tools)
+           ↓               ↓
+    OpenRouter → Kimi K2   webSearch tool (Serper/Brave/Tavily)
+           ↓
+    ContextCompressor (every 3 iterations)
+           ↓
+    MissionReportStore ← auto-synthesis on completion
+           ↓
+    AgentMap (D3) + ActivityStream + MissionReport panel
 ```
 
 ### Directory Structure
@@ -42,19 +61,24 @@ Operator → Landing → /demo → Mission Control
 ```
 src/
 ├── pages/           Landing, Demo, Login, AuthCallback
-├── components/      AgentMap, AgentNode, ActivityStream, InterventionPanel,
-│                    PresetSelector, CustomMissionInput, ProtectedRoute
-├── services/        orchestrationService, requestQueue, contextCompressor,
-│                    streamParser, mockAgentService, presetService
-├── stores/          agentStore, authStore, themeStore (Zustand)
+├── components/
+│   ├── map/         AgentMap, AgentOrb, OrganicEdge, MapControls,
+│   │                RippleLayer, InlineIntervention, OrbDetailOverlay
+│   ├── stream/      ActivityStream
+│   └── ...          PresetSelector, CustomMissionInput, MissionReport,
+│                    MissionHistory, BetaWelcome, CreditBalance, ConfirmDialog
+├── services/        orchestrationService, findingsRegistry, requestQueue,
+│                    contextCompressor, streamParser, presetService, mockAgentService
+├── stores/          agentStore, missionReportStore, authStore, creditStore, themeStore
 ├── lib/             supabase client
-└── utils/           colorScheme, layoutEngine
+└── utils/           colorScheme, orbStyles, forceLayoutEngine, renderMarkdown
 
 api/
 ├── agent.js           Edge Function — LLM proxy (non-streaming)
-├── agent-stream.js    Edge Function — streaming via AI SDK
+├── agent-stream.js    Edge Function — streaming + web search via AI SDK tools
 ├── plan-mission.js    Edge Function — mission planner (streaming)
-└── _middleware/auth.js JWT validation
+├── search.js          Edge Function — modular web search (Serper/Brave/Tavily)
+└── _middleware/       JWT auth + credit check
 ```
 
 ## Getting Started
@@ -80,11 +104,14 @@ Edit `.env` with your keys:
 # Required — LLM access
 OPENROUTER_API_KEY=sk-or-v1-...
 
-# Optional — persistence + auth
+# Optional — persistence + auth + credits
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-key
+
+# Optional — web search for agents (Serper: 2500 free queries/month)
+SERPER_API_KEY=your-serper-key
 ```
 
 ### Run
@@ -92,7 +119,7 @@ SUPABASE_SERVICE_KEY=your-service-key
 ```bash
 npm run dev        # Development server (Vite, port 5173)
 npm run build      # Production build
-npm test           # Run test suite (Vitest)
+npm test           # Run test suite (95 tests, Vitest)
 ```
 
 ### Deploy
@@ -109,6 +136,7 @@ When Supabase is configured, the app requires authentication to access Mission C
 
 - **Magic link** (default) — passwordless email sign-in
 - **Email/password** — traditional sign-up with email confirmation
+- New users automatically receive **$10 in beta credits**
 - API endpoints validate JWTs server-side; unverified emails are rejected
 - Without Supabase env vars, auth is bypassed entirely (demo mode)
 
@@ -121,9 +149,10 @@ When Supabase is configured, the app requires authentication to access Mission C
 | State | Zustand 5 |
 | Visualization | D3 (hierarchy, zoom, selection) |
 | LLM | OpenRouter (Kimi K2) via Vercel AI SDK |
-| Auth & Database | Supabase (RLS, JWT, Realtime) |
+| Web Search | Serper (default), Brave, Tavily |
+| Auth & Database | Supabase (RLS, JWT, credits) |
 | API | Vercel Edge Functions |
-| Testing | Vitest |
+| Testing | Vitest 4 (95 tests) |
 
 ## Research
 
