@@ -154,7 +154,9 @@ create policy "Presets are viewable by everyone" on presets for select using (tr
 create policy "Users can view their own sessions" on sessions for select using (
   auth.uid() = user_id or user_id is null
 );
-create policy "Users can create sessions" on sessions for insert with check (true);
+create policy "Users can create their own sessions" on sessions for insert with check (
+  auth.uid() = user_id or user_id is null
+);
 create policy "Users can update their own sessions" on sessions for update using (
   auth.uid() = user_id or user_id is null
 );
@@ -163,21 +165,36 @@ create policy "Users can update their own sessions" on sessions for update using
 create policy "Users can view agents in their sessions" on agents for select using (
   exists (select 1 from sessions where sessions.id = agents.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
 );
-create policy "Users can create agents" on agents for insert with check (true);
-create policy "Users can update agents" on agents for update using (true);
+create policy "Users can create agents in their sessions" on agents for insert with check (
+  exists (select 1 from sessions where sessions.id = agents.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
+create policy "Users can update agents in their sessions" on agents for update using (
+  exists (select 1 from sessions where sessions.id = agents.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
 
 -- Events: follow session access
 create policy "Users can view events in their sessions" on events for select using (
   exists (select 1 from sessions where sessions.id = events.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
 );
-create policy "Events can be created" on events for insert with check (true);
+create policy "Users can create events in their sessions" on events for insert with check (
+  exists (select 1 from sessions where sessions.id = events.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
 
--- Messages and Artifacts: follow agent access
-create policy "Users can view agent messages" on agent_messages for select using (true);
-create policy "Messages can be created" on agent_messages for insert with check (true);
+-- Messages: follow session access via agent
+create policy "Users can view messages in their sessions" on agent_messages for select using (
+  exists (select 1 from agents join sessions on sessions.id = agents.session_id where agents.id = agent_messages.agent_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
+create policy "Users can create messages in their sessions" on agent_messages for insert with check (
+  exists (select 1 from agents join sessions on sessions.id = agents.session_id where agents.id = agent_messages.agent_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
 
-create policy "Users can view artifacts" on artifacts for select using (true);
-create policy "Artifacts can be created" on artifacts for insert with check (true);
+-- Artifacts: follow session access
+create policy "Users can view artifacts in their sessions" on artifacts for select using (
+  exists (select 1 from sessions where sessions.id = artifacts.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
+create policy "Users can create artifacts in their sessions" on artifacts for insert with check (
+  exists (select 1 from sessions where sessions.id = artifacts.session_id and (sessions.user_id = auth.uid() or sessions.user_id is null))
+);
 
 -- ============================================
 -- CREDITS SYSTEM

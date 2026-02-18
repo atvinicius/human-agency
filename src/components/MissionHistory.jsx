@@ -259,21 +259,32 @@ function MissionDetail({ missionId, onBack, onRelaunch }) {
 
 export default function MissionHistory({ onClose, onRelaunch }) {
   const userId = useAuthStore((s) => s.user?.id);
+  const authLoading = useAuthStore((s) => s.loading);
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMissionId, setSelectedMissionId] = useState(null);
 
   useEffect(() => {
+    // Wait for auth to finish initializing before deciding
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     if (!userId) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    getMissionHistory(userId).then((data) => {
-      setMissions(data);
-      setLoading(false);
-    });
-  }, [userId]);
+    getMissionHistory(userId)
+      .then((data) => {
+        setMissions(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch mission history:', err);
+        setLoading(false);
+      });
+  }, [authLoading, userId]);
 
   return (
     <motion.div
