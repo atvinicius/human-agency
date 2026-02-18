@@ -111,19 +111,6 @@ export default function Demo() {
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
 
-  const isMissionRunning = currentPreset && agents.some(
-    (a) => !['completed', 'failed'].includes(a.status)
-  );
-
-  const handleSignOut = async () => {
-    if (isMissionRunning) {
-      setConfirmAction({ type: 'signout' });
-      return;
-    }
-    await signOut();
-    navigate('/login');
-  };
-
   const {
     agents,
     selectedAgentId,
@@ -141,6 +128,19 @@ export default function Demo() {
   } = useAgentStore();
 
   const stats = getStats();
+
+  const isMissionRunning = currentPreset && agents.some(
+    (a) => !['completed', 'failed'].includes(a.status)
+  );
+
+  const handleSignOut = async () => {
+    if (isMissionRunning) {
+      setConfirmAction({ type: 'signout' });
+      return;
+    }
+    await signOut();
+    navigate('/login');
+  };
 
   // Auto-focus on agents that need input
   const waitingAgent = agents.find((a) => a.pendingInput || a.pending_input);
