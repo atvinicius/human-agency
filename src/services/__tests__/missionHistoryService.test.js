@@ -6,14 +6,44 @@ const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockOrder = vi.fn();
 const mockLimit = vi.fn();
-const mockIn = vi.fn();
 const mockSingle = vi.fn();
+
+// Agent count data: s1 has 2 agents, s2 has 1 agent
+const agentCountMap = { s1: 2, s2: 1 };
 
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: () => true,
   supabase: {
     from: (table) => {
       mockFrom(table);
+      if (table === 'agents') {
+        // Count-only query: .select('id', { count, head }).eq('session_id', sid)
+        return {
+          select: (...args) => {
+            mockSelect(...args);
+            return {
+              eq: (col, val) => {
+                mockEq(col, val);
+                return Promise.resolve({
+                  count: agentCountMap[val] || 0,
+                  error: null,
+                });
+              },
+              // For getMissionDetails: .eq('session_id', sid).order(...).limit(...)
+              order: (...args3) => {
+                mockOrder(...args3);
+                return {
+                  limit: (...args4) => {
+                    mockLimit(...args4);
+                    return Promise.resolve({ data: [], error: null });
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+      // Sessions and other tables
       return {
         select: (...args) => {
           mockSelect(...args);
@@ -26,7 +56,6 @@ vi.mock('../../lib/supabase', () => ({
                   return {
                     limit: (...args4) => {
                       mockLimit(...args4);
-                      // Return sessions data
                       if (table === 'sessions') {
                         return Promise.resolve({
                           data: [
@@ -55,17 +84,6 @@ vi.mock('../../lib/supabase', () => ({
                   });
                 },
               };
-            },
-            in: (...args2) => {
-              mockIn(...args2);
-              return Promise.resolve({
-                data: [
-                  { session_id: 's1' },
-                  { session_id: 's1' },
-                  { session_id: 's2' },
-                ],
-                error: null,
-              });
             },
           };
         },

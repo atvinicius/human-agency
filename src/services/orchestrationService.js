@@ -583,6 +583,9 @@ export class OrchestrationService {
     // Create session in Supabase
     if (isSupabaseConfigured()) {
       const userId = useAuthStore.getState().user?.id;
+      if (!userId) {
+        console.warn('Session created without user_id — auth may not have resolved yet. The subscribe fallback will patch it.');
+      }
       try {
         await supabase.from('sessions').insert({
           id: this.sessionId,
@@ -609,6 +612,8 @@ export class OrchestrationService {
               .then(() => unsub());
           }
         });
+        // Clean up if auth never resolves within 30s
+        setTimeout(() => unsub(), 30_000);
       }
     }
 
