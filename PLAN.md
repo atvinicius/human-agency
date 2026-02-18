@@ -266,10 +266,12 @@ supabase/
 
 1. **Search credit deduction not wired** — `SEARCH_PRICING` defined but not yet deducted from user balance per search query
 2. **No observability** — No tracing of LLM calls, token usage, latency, costs
-3. **CORS wildcard on API routes** — All API routes use `*` CORS; should restrict to app domain in production
+3. **CORS wildcard on API routes** — All API routes use `*` CORS; set `ALLOWED_ORIGIN` env var to restrict in production
 4. **Not yet tested end-to-end in production** — Server-side orchestration code is deployed but no mission has been run in server-side mode yet
 5. **Vercel Hobby limits** — Fluid Compute (300s) is Pro-only; Hobby caps at 60s for Node.js functions
 6. **`user_id IS NULL` window** — Sessions created before auth resolves may have null user_id; mitigated via auth-subscribe fallback but not fully eliminated
+7. **Dynamic pricing not wired** — `model_pricing` table exists and is seeded but JS code uses hardcoded constants; could query table on a TTL cache
+8. **Per-isolate rate limiting** — current rate limiter is per-edge-isolate (best effort); strict enforcement needs Vercel KV or Upstash Redis as shared counter
 
 ---
 
@@ -325,9 +327,18 @@ supabase/
 - [ ] Virtual rendering for 100+ agents
 - [ ] Template marketplace
 
+### Pre-Launch Checklist (Supabase/Vercel config, not code)
+- [ ] Enable "Confirm email" in Supabase Auth — prevents beta credit farming with disposable emails
+- [ ] Enable CAPTCHA on signup (hCaptcha or Turnstile) — blocks bot signups
+- [ ] Set `ALLOWED_ORIGIN` env var in Vercel — restricts CORS from wildcard to app domain
+- [ ] Set up Vercel log drain / alert for `[billing]` tags — failed deductions logged as `[billing] Deduction FAILED — needs reconciliation`
+
 ### Phase 7: Production Hardening
 - [ ] End-to-end production testing of server-side mode
 - [ ] Observability (Langfuse integration)
+- [ ] Per-session spending caps — max spend per mission (e.g., $2) to prevent runaway agent loops
+- [ ] Daily spending alerts — notify users when >50% balance spent in a day
+- [ ] Multi-step token awareness — `maxSteps: 3` can consume ~6k output tokens; consider per-call cost cap
 - [ ] MCP integration for standardized tool access
 - [ ] Distributed workers for horizontal scaling
 - [ ] Learning system — successful patterns captured and reused
