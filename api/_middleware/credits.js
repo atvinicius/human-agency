@@ -24,7 +24,9 @@ export async function checkCredits(userId) {
     .single();
 
   if (error || !data) {
-    return { allowed: false, balance: 0 };
+    // No credit record means the user hasn't activated credits yet —
+    // allow the call (credits not enforced for this user).
+    return null;
   }
 
   return {
