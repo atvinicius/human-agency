@@ -86,9 +86,43 @@ A visual "Mission Control" interface where humans direct swarms of AI agents. In
 - [x] React Router DOM for `/`, `/demo`, `/login` routes
 - [x] Zustand state management (agentStore, missionReportStore, authStore, creditStore, themeStore)
 - [x] Supabase (auth, persistence, credits)
-- [x] Vercel deployment with Edge Functions
+- [x] Vercel deployment with Serverless Functions
 - [x] Environment variable management (`.env`, `.env.example`)
-- [x] 95 tests across 10 test files (Vitest 4)
+- [x] 98 tests across 10 test files (Vitest 4)
+
+### Server-Side Orchestration (PR #3, #1)
+- [x] DB-persisted agents, messages, sessions, findings, report sections (migration `003_server_orchestration.sql`)
+- [x] `api/iterate.js` — server-side agent iteration via `generateText()` (Node.js runtime)
+- [x] `api/orchestrate.js` — pg_cron dispatcher, claims + iterates agents server-side
+- [x] `api/respond-input.js` — human input submission for server-side agents
+- [x] Shared modules: `api/_lib/parseResponse.js`, `api/_lib/agentQueries.js`, `api/_lib/spawnLogic.js`
+- [x] Role-based prompts in `api/_config/prompts.js`
+- [x] `claim_agent_for_iteration` RPC with `FOR UPDATE SKIP LOCKED` for safe concurrency
+- [x] Supabase Realtime subscriptions in agentStore + missionReportStore (agents, events, report_sections)
+- [x] Mission resume: `resumeSession(sessionId)` loads from DB, subscribes to Realtime
+- [x] Synthesis enrichment: agent objectives + search findings injected for richer output
+- [x] On-demand pg_cron: `enable_orchestration()` / `disable_orchestration()` (migration `005_on_demand_scheduling.sql`)
+- [x] Dual-mode orchestrationService: client-side (browser) or server-side (default when Supabase configured)
+
+### Auth, History & Security Fixes (PR #2)
+- [x] Auth race condition fix — `initialized` flag + `waitForAuth()` in authStore
+- [x] MissionHistory waits for auth before fetching sessions
+- [x] Session creation ensures `user_id` via auth-subscribe fallback
+- [x] Database indexes on `sessions(user_id)` and `sessions(user_id, started_at DESC)`
+- [x] 9 RLS policies tightened to prevent cross-user data leaks (migration `004_tighten_rls.sql`)
+- [x] ProtectedRoute component for authenticated routes
+
+### Credits Hardening (PR #4)
+- [x] Credit deduction on both client (agent-stream.js onFinish) and server (iterate.js after generateText)
+- [x] Hardened billing with 402 responses on insufficient credits
+- [x] Credit balance polling + transaction logging
+
+### Output Overhaul (PR #3, #1)
+- [x] Enriched report data model with report_sections table
+- [x] Redesigned MissionReport UI with tabs (Report/Artifacts/Raw Findings)
+- [x] Report sub-components: `FindingCard.jsx`, `SourceList.jsx`, `TimelineView.jsx`
+- [x] Intervention panel: `InterventionPanel.jsx`, `QuickActions.jsx`
+- [x] Timeline components: `PulseBar.jsx`, `TimelineTooltip.jsx`
 
 ### Research & Strategy (docs/)
 - [x] Architecture analysis with gap identification and evolution roadmap
@@ -103,18 +137,24 @@ A visual "Mission Control" interface where humans direct swarms of AI agents. In
 User → Landing.jsx → /demo → Demo.jsx → PresetSelector / CustomMissionInput
                                 ↓                            ↓
                       OrchestrationService          /api/plan-mission (streaming)
-                        ↓       ↓       ↓                   ↓
-                  RequestQueue  AgentStore  FindingsRegistry  Agent tree preview → Launch
-                     ↓          (Zustand)    (per-session)
-              /api/agent-stream (SSE + tools)
-                     ↓               ↓
-              OpenRouter → Kimi K2   webSearch tool (Serper/Brave/Tavily)
-                     ↓
-             ContextCompressor (every 3 iterations)
-                     ↓
-             MissionReportStore ← auto-synthesis on completion
-                     ↓
-          AgentMap (D3) + ActivityStream + MissionReport panel
+                    (dual-mode: client|server)               ↓
+                        ↓       ↓       ↓           Agent tree preview → Launch
+                  RequestQueue  AgentStore  FindingsRegistry
+                     ↓          (Zustand +    (per-session)
+                     ↓           Realtime)
+         ┌───────────┴───────────────┐
+   CLIENT-SIDE                 SERVER-SIDE (default)
+   /api/agent-stream           pg_cron → /api/orchestrate.js
+   (SSE + tools)                  ↓
+         ↓                    /api/iterate.js (generateText)
+   OpenRouter → Kimi K2           ↓
+         ↓                    OpenRouter → Kimi K2
+   ContextCompressor               ↓
+   (every 3 iterations)      Supabase DB (agents, messages, findings, report_sections)
+         ↓                        ↓
+   MissionReportStore ←── Realtime subscriptions (INSERT/UPDATE)
+         ↓
+   AgentMap (D3) + ActivityStream + MissionReport panel
 ```
 
 ### Directory Structure
@@ -139,17 +179,28 @@ src/
 │   │   └── MapControls.jsx         # Zoom/fit controls
 │   ├── stream/
 │   │   └── ActivityStream.jsx      # Event feed with search events
+│   ├── report/
+│   │   ├── FindingCard.jsx         # Individual finding display
+│   │   ├── SourceList.jsx          # Source references list
+│   │   └── TimelineView.jsx        # Timeline visualization
+│   ├── intervention/
+│   │   ├── InterventionPanel.jsx   # Human input panel
+│   │   └── QuickActions.jsx        # Quick action buttons
+│   ├── timeline/
+│   │   ├── PulseBar.jsx            # Activity pulse indicator
+│   │   └── TimelineTooltip.jsx     # Timeline hover tooltip
 │   ├── PresetSelector.jsx          # Research mission picker
 │   ├── CustomMissionInput.jsx      # Custom objective → AI-planned agent tree
 │   ├── MissionReport.jsx           # Consolidated output panel
-│   ├── MissionHistory.jsx          # Past mission list + re-launch
+│   ├── MissionHistory.jsx          # Past mission list + resume
 │   ├── BetaWelcome.jsx             # First-login welcome modal
 │   ├── ConfirmDialog.jsx           # Destructive action confirmation
 │   ├── CreditBalance.jsx           # Header credit display
+│   ├── ProtectedRoute.jsx          # Auth-gated route wrapper
 │   └── ThemeToggle.jsx             # Dark/light mode
 │
 ├── services/
-│   ├── orchestrationService.js     # Core engine + spawn limits + collaboration + report
+│   ├── orchestrationService.js     # Core engine (dual-mode: client/server)
 │   ├── findingsRegistry.js         # Inter-agent shared findings store
 │   ├── requestQueue.js             # Priority queue for concurrent LLM calls
 │   ├── contextCompressor.js        # Rolling context summaries
@@ -159,9 +210,9 @@ src/
 │   └── missionHistoryService.js    # Supabase mission CRUD
 │
 ├── stores/
-│   ├── agentStore.js               # Agents, events, dataTransfers, filters
-│   ├── missionReportStore.js       # Consolidated output state
-│   ├── authStore.js                # Supabase auth state
+│   ├── agentStore.js               # Agents, events, dataTransfers + Realtime subscriptions
+│   ├── missionReportStore.js       # Report sections + Realtime subscriptions
+│   ├── authStore.js                # Supabase auth state + initialized flag
 │   ├── creditStore.js              # Credit balance + transactions
 │   └── themeStore.js               # Dark/light mode
 │
@@ -171,25 +222,42 @@ src/
 └── utils/
     ├── colorScheme.js              # Role/status color mapping
     ├── orbStyles.js                # Orb gradient/glow/pulse utilities
+    ├── eventVisuals.js             # Event type visual config
     ├── forceLayoutEngine.js        # D3 force simulation
+    ├── layoutEngine.js             # Layout calculation utilities
     ├── missionUtils.js             # Tree flatten/count helpers
     └── renderMarkdown.jsx          # Lightweight markdown renderer
 
 api/
-├── agent.js                        # Non-streaming Edge Function (LLM proxy)
-├── agent-stream.js                 # Streaming Edge Function (AI SDK + tools)
+├── agent.js                        # Non-streaming Serverless Function (LLM proxy)
+├── agent-stream.js                 # Streaming Serverless Function (AI SDK + tools)
+├── iterate.js                      # Server-side agent iteration (generateText, Node.js)
+├── orchestrate.js                  # pg_cron dispatcher (claim + iterate agents)
 ├── plan-mission.js                 # Mission planner (streaming)
+├── respond-input.js                # Human input for server-side agents
 ├── search.js                       # Modular web search (Serper/Brave/Tavily)
-├── _middleware/
-│   ├── auth.js                     # Request authentication
-│   └── credits.js                  # Credit check + deduction
-└── _config/
-    └── pricing.js                  # Model + search pricing
+├── credits.js                      # Credit balance + transactions API
+├── _lib/
+│   ├── agentQueries.js             # Shared Supabase agent queries
+│   ├── parseResponse.js            # Shared response parsing
+│   └── spawnLogic.js               # Shared canSpawn() logic
+├── _config/
+│   ├── prompts.js                  # Role-based system prompts
+│   ├── pricing.js                  # Model + search pricing
+│   └── cors.js                     # CORS configuration
+└── _middleware/
+    ├── auth.js                     # Request authentication
+    └── credits.js                  # Credit check + deduction
 
 supabase/
 └── migrations/
-    ├── 001_credits_and_promos.sql  # Credits, transactions, promo codes
-    └── 002_beta_auto_credits.sql   # Auto-grant $10 to new users
+    ├── 001_credits_and_promos.sql      # Credits, transactions, promo codes
+    ├── 002_beta_auto_credits.sql       # Auto-grant $10 to new users
+    ├── 003_server_orchestration.sql    # Agents, messages, sessions, findings, report_sections, RPC functions
+    ├── 003_sessions_user_id_index.sql  # Index on sessions(user_id)
+    ├── 004_tighten_rls.sql             # Tightened RLS policies (gitignored: contains secrets)
+    ├── 004_background_scheduling.sql   # Background scheduling setup
+    └── 005_on_demand_scheduling.sql    # On-demand pg_cron (gitignored: contains secrets)
 ```
 
 ---
@@ -197,9 +265,11 @@ supabase/
 ## Known Gaps & Technical Debt
 
 1. **Search credit deduction not wired** — `SEARCH_PRICING` defined but not yet deducted from user balance per search query
-2. **Supabase not source of truth** — Zustand is still runtime state; no Realtime subscriptions for sync
-3. **No observability** — No tracing of LLM calls, token usage, latency, costs
-4. **Client-side orchestration** — Execution engine runs in browser; missions die if tab closes (background execution only survives navigation within the app)
+2. **No observability** — No tracing of LLM calls, token usage, latency, costs
+3. **CORS wildcard on API routes** — All API routes use `*` CORS; should restrict to app domain in production
+4. **Not yet tested end-to-end in production** — Server-side orchestration code is deployed but no mission has been run in server-side mode yet
+5. **Vercel Hobby limits** — Fluid Compute (300s) is Pro-only; Hobby caps at 60s for Node.js functions
+6. **`user_id IS NULL` window** — Sessions created before auth resolves may have null user_id; mitigated via auth-subscribe fallback but not fully eliminated
 
 ---
 
@@ -211,7 +281,7 @@ supabase/
 - [x] Streaming responses via AI SDK
 - [x] Event importance classification
 - [x] Custom mission input with AI planner
-- [ ] Supabase as source of truth (Realtime subscriptions)
+- [x] Supabase as source of truth (Realtime subscriptions)
 
 ### Safety, Credits & Research Overhaul ✓ (Complete)
 - [x] Confirmation dialogs for destructive actions
@@ -225,6 +295,17 @@ supabase/
 - [x] Web search for agents (Serper/Brave/Tavily)
 - [x] Consolidated MissionReport panel with auto-synthesis
 - [x] Data flow visualization (directional particles, search rings)
+
+### Server-Side Orchestration ✓ (Complete)
+- [x] Server-side orchestration — missions survive tab close (pg_cron + iterate.js)
+- [x] DB persistence for agents, messages, findings, report sections
+- [x] Realtime subscriptions for live UI updates
+- [x] On-demand pg_cron scheduling (start/stop with missions)
+- [x] Mission resume from DB state
+- [x] Synthesis enrichment with agent objectives + findings
+- [x] Auth race condition fix + RLS hardening (9 policies)
+- [x] Credits hardening for production billing
+- [x] Output overhaul — enriched report model + redesigned UI
 
 ### Phase 4: Advanced Agent Cohesion
 - [ ] Agent messaging bus — real-time pub/sub for discovery sharing
@@ -242,11 +323,10 @@ supabase/
 - [ ] Auto-grouping (>5 siblings → aggregate view)
 - [ ] Mini-map navigation for large agent trees
 - [ ] Virtual rendering for 100+ agents
-- [ ] Session persistence (resume after reload)
 - [ ] Template marketplace
 
 ### Phase 7: Production Hardening
-- [ ] Server-side orchestration (missions survive tab close completely)
+- [ ] End-to-end production testing of server-side mode
 - [ ] Observability (Langfuse integration)
 - [ ] MCP integration for standardized tool access
 - [ ] Distributed workers for horizontal scaling
@@ -265,19 +345,19 @@ supabase/
 | Visualization | D3 (force, zoom, selection) |
 | Routing | React Router DOM 7 |
 | Icons | Lucide React |
-| Database | Supabase (auth, persistence, credits) |
-| API | Vercel Edge Functions |
+| Database | Supabase (auth, persistence, credits, Realtime) |
+| API | Vercel Serverless Functions |
 | LLM | OpenRouter → Kimi K2 |
-| Streaming | Vercel AI SDK (`ai`, `@openrouter/ai-sdk-provider`) |
+| AI SDK | Vercel AI SDK (`ai`, `@openrouter/ai-sdk-provider`) |
 | Tools | AI SDK `tool()` with Zod schemas |
 | Web Search | Serper (default), Brave, Tavily |
+| Scheduling | pg_cron + pg_net (on-demand) |
 | Validation | Zod 3 |
-| Testing | Vitest 4 (95 tests) |
+| Testing | Vitest 4 (98 tests) |
 
 ### Planned Additions
 | Technology | Purpose | Phase |
 |-----------|---------|-------|
-| Supabase Realtime | State sync across devices | 3 (remainder) |
 | Langfuse | LLM observability and tracing | 7 |
 | MCP | Standard tool/resource integration | 7 |
 
@@ -289,11 +369,14 @@ supabase/
 # Required
 OPENROUTER_API_KEY=...           # OpenRouter API key (server-side)
 
-# Supabase (required for auth/credits)
+# Supabase (required for auth/credits/server-side orchestration)
 VITE_SUPABASE_URL=...            # Client-side Supabase URL
 VITE_SUPABASE_ANON_KEY=...       # Client-side anon key
 SUPABASE_URL=...                 # Server-side Supabase URL
 SUPABASE_SERVICE_KEY=...         # Server-side service key
+
+# Server-side orchestration
+ORCHESTRATE_SECRET=...           # Shared secret for pg_cron → orchestrate.js auth
 
 # Web Search (optional — agents work without it, just no search tool)
 SERPER_API_KEY=...               # Serper.dev API key (2500 free/month)
