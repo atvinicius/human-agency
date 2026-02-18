@@ -1,18 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { useCreditStore } from '../stores/creditStore';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [timedOut, setTimedOut] = useState(false);
+  const promoRedeemed = useRef(false);
 
   // Navigate to /demo once user is set by onAuthStateChange
+  // Also redeem any pending promo code
   useEffect(() => {
     if (user) {
-      navigate('/demo', { replace: true });
+      const pendingPromo = localStorage.getItem('pending_promo_code');
+      if (pendingPromo && !promoRedeemed.current) {
+        promoRedeemed.current = true;
+        useCreditStore.getState().redeemPromoCode(pendingPromo).then(() => {
+          localStorage.removeItem('pending_promo_code');
+          navigate('/demo', { replace: true });
+        });
+      } else {
+        navigate('/demo', { replace: true });
+      }
     }
   }, [user, navigate]);
 

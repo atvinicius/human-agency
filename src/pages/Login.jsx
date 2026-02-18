@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Loader, CheckCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader, CheckCircle, Gift } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 export default function Login() {
@@ -20,6 +20,7 @@ export default function Login() {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [confirmationPending, setConfirmationPending] = useState(false);
@@ -34,6 +35,11 @@ export default function Login() {
     if (!email || !password) return;
     setLoading(true);
     clearError();
+
+    // Store promo code before auth so it can be redeemed after confirmation
+    if (mode === 'signup' && promoCode.trim()) {
+      localStorage.setItem('pending_promo_code', promoCode.trim());
+    }
 
     const result = mode === 'signin'
       ? await signIn(email, password)
@@ -54,6 +60,11 @@ export default function Login() {
     if (!email) return;
     setLoading(true);
     clearError();
+
+    // Store promo code before magic link redirect
+    if (promoCode.trim()) {
+      localStorage.setItem('pending_promo_code', promoCode.trim());
+    }
 
     const result = await signInWithMagicLink(email);
     setLoading(false);
@@ -245,6 +256,18 @@ export default function Login() {
                   style={inputStyle}
                 />
               </div>
+              {mode === 'signup' && (
+                <div style={{ position: 'relative' }}>
+                  <Gift size={16} style={iconStyle} />
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    placeholder="Promo code (optional)"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
             </div>
 
             <button
@@ -304,16 +327,28 @@ export default function Login() {
         {/* Magic link mode */}
         {method === 'magic' && !magicLinkSent && (
           <form onSubmit={handleMagicLink}>
-            <div style={{ position: 'relative', marginBottom: '20px' }}>
-              <Mail size={16} style={iconStyle} />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                required
-                style={inputStyle}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ position: 'relative' }}>
+                <Mail size={16} style={iconStyle} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email"
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ position: 'relative' }}>
+                <Gift size={16} style={iconStyle} />
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  placeholder="Promo code (optional)"
+                  style={inputStyle}
+                />
+              </div>
             </div>
 
             <button

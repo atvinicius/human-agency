@@ -3,6 +3,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
+import { checkCredits, deductCredits } from './_middleware/credits.js';
+import { calculateCost } from './_config/pricing.js';
 
 export const config = {
   runtime: 'edge',
@@ -174,6 +176,20 @@ export default async function handler(req) {
     const body = await req.json();
     const { agent, messages, sessionId } = body;
 
+    // Credit check before making LLM call
+    if (authUser) {
+      const creditCheck = await checkCredits(authUser.id);
+      if (creditCheck && !creditCheck.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Insufficient credits',
+          balance: creditCheck.balance,
+        }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Build system prompt based on role
     const systemPrompt = `${ROLE_PROMPTS[agent.role] || ROLE_PROMPTS.executor}
 
@@ -270,10 +286,29 @@ Respond with a JSON object containing:
       }
     }
 
+    // Deduct credits based on token usage
+    let cost = null;
+    let balance = null;
+    if (authUser && data.usage) {
+      const modelId = agent.model || 'moonshotai/kimi-k2';
+      cost = calculateCost(modelId, data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0);
+      const deductResult = await deductCredits(
+        authUser.id, modelId,
+        data.usage.prompt_tokens || 0,
+        data.usage.completion_tokens || 0,
+        sessionId
+      );
+      if (deductResult?.success) {
+        balance = deductResult.balance;
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       result: parsed,
       usage: data.usage,
+      cost,
+      balance,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

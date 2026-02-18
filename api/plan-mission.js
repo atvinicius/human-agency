@@ -4,6 +4,7 @@
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
+import { checkCredits, deductCredits } from './_middleware/credits.js';
 
 export const config = {
   runtime: 'edge',
@@ -101,6 +102,20 @@ export default async function handler(req) {
       });
     }
 
+    // Credit check before making LLM call
+    if (authUser) {
+      const creditCheck = await checkCredits(authUser.id);
+      if (creditCheck && !creditCheck.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Insufficient credits',
+          balance: creditCheck.balance,
+        }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const model = openrouter('moonshotai/kimi-k2');
 
     const result = streamText({
@@ -114,6 +129,15 @@ export default async function handler(req) {
       ],
       temperature: 0.7,
       maxTokens: 3000,
+      onFinish: async ({ usage }) => {
+        if (authUser && usage) {
+          await deductCredits(
+            authUser.id, 'moonshotai/kimi-k2',
+            usage.promptTokens || 0,
+            usage.completionTokens || 0
+          );
+        }
+      },
     });
 
     return result.toTextStreamResponse({

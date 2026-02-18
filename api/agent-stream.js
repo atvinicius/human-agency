@@ -4,6 +4,7 @@
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
+import { checkCredits, deductCredits } from './_middleware/credits.js';
 
 export const config = {
   runtime: 'edge',
@@ -92,7 +93,21 @@ export default async function handler(req) {
   }
 
   try {
-    const { agent, messages } = await req.json();
+    const { agent, messages, sessionId } = await req.json();
+
+    // Credit check before making LLM call
+    if (authUser) {
+      const creditCheck = await checkCredits(authUser.id);
+      if (creditCheck && !creditCheck.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Insufficient credits',
+          balance: creditCheck.balance,
+        }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     const systemPrompt = `${ROLE_PROMPTS[agent.role] || ROLE_PROMPTS.executor}
 
@@ -119,6 +134,18 @@ Respond with a JSON object containing:
       messages,
       temperature: 0.7,
       maxTokens: 2000,
+      onFinish: async ({ usage }) => {
+        // Deduct credits after stream completes
+        if (authUser && usage) {
+          const modelId = agent.model || 'moonshotai/kimi-k2';
+          await deductCredits(
+            authUser.id, modelId,
+            usage.promptTokens || 0,
+            usage.completionTokens || 0,
+            sessionId || null
+          );
+        }
+      },
     });
 
     return result.toTextStreamResponse({

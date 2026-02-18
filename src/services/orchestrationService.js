@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAgentStore } from '../stores/agentStore';
 import { useAuthStore } from '../stores/authStore';
+import { useCreditStore } from '../stores/creditStore';
 import { RequestQueue } from './requestQueue';
 import { shouldCompress, compressContext } from './contextCompressor';
 import { parseDataStream, parseAgentResponse } from './streamParser';
@@ -111,7 +112,7 @@ async function spawnAgentTree(config, sessionId, parentId = null, store) {
 }
 
 // Agent execution loop
-async function executeAgent(agentId, store) {
+async function executeAgent(agentId, store, orchestrator) {
   const agent = store.getAgentById(agentId);
   if (!agent) return;
 
@@ -134,6 +135,9 @@ async function executeAgent(agentId, store) {
   const maxIterations = 10;
 
   while (iterations < maxIterations) {
+    // Check if orchestrator was stopped
+    if (!orchestrator.running) break;
+
     iterations++;
 
     const currentAgent = store.getAgentById(agentId);
@@ -201,8 +205,12 @@ async function executeAgent(agentId, store) {
           const childAgent = createAgentFromConfig(spawnConfig, currentAgent.session_id, agentId);
           store.addAgent(childAgent);
 
-          // Start child execution asynchronously
-          setTimeout(() => executeAgent(childAgent.id, store), 1000);
+          // Start child execution asynchronously, tracking the timeout
+          const timeoutId = setTimeout(() => {
+            orchestrator.childTimeouts.delete(timeoutId);
+            executeAgent(childAgent.id, store, orchestrator);
+          }, 1000);
+          orchestrator.childTimeouts.add(timeoutId);
         }
       }
 
@@ -249,6 +257,17 @@ async function executeAgent(agentId, store) {
 
     } catch (error) {
       if (error.message === 'Cancelled') break;
+
+      // Handle insufficient credits (402)
+      if (error.status === 402) {
+        store.updateAgent(agentId, {
+          status: 'paused',
+          current_activity: 'Insufficient credits — add credits to continue',
+        });
+        useCreditStore.getState().fetchBalance();
+        break;
+      }
+
       console.error(`Agent ${agentId} error:`, error);
       store.updateAgent(agentId, {
         status: 'failed',
@@ -265,6 +284,9 @@ export class OrchestrationService {
     this.store = useAgentStore.getState();
     this.sessionId = null;
     this.running = false;
+    this.currentPreset = null;
+    this.startTime = null;
+    this.childTimeouts = new Set();
 
     // Subscribe to store changes
     useAgentStore.subscribe((state) => {
@@ -272,21 +294,37 @@ export class OrchestrationService {
     });
   }
 
+  getStatus() {
+    return {
+      running: this.running,
+      sessionId: this.sessionId,
+      preset: this.currentPreset,
+      startTime: this.startTime,
+    };
+  }
+
   async startSession(preset) {
     this.running = true;
+    this.currentPreset = preset;
+    this.startTime = Date.now();
     this.sessionId = crypto.randomUUID();
 
     // Create session in Supabase
     if (isSupabaseConfigured()) {
       const userId = useAuthStore.getState().user?.id;
-      await supabase.from('sessions').insert({
-        id: this.sessionId,
-        name: preset.name,
-        preset_id: preset.id,
-        objective: preset.initial_objective,
-        status: 'active',
-        ...(userId && { user_id: userId }),
-      });
+      try {
+        await supabase.from('sessions').insert({
+          id: this.sessionId,
+          name: preset.name,
+          preset_id: preset.id,
+          objective: preset.initial_objective,
+          status: 'active',
+          metadata: { preset_config: preset },
+          ...(userId && { user_id: userId }),
+        });
+      } catch (err) {
+        console.error('Failed to create session in Supabase:', err);
+      }
     }
 
     // Spawn initial agent tree
@@ -305,18 +343,34 @@ export class OrchestrationService {
     // Start execution for root agent
     const rootAgent = this.store.agents.find((a) => !a.parent_id);
     if (rootAgent) {
-      executeAgent(rootAgent.id, this.store);
+      executeAgent(rootAgent.id, this.store, this);
     }
 
     return this.sessionId;
   }
 
-  stop() {
+  async stop() {
     this.running = false;
+    this.currentPreset = null;
+    this.startTime = null;
     requestQueue.cancelAll();
+
+    // Clear all pending child agent timeouts
+    for (const timeoutId of this.childTimeouts) {
+      clearTimeout(timeoutId);
+    }
+    this.childTimeouts.clear();
+
     // Mark session as completed
     if (isSupabaseConfigured() && this.sessionId) {
-      supabase.from('sessions').update({ status: 'completed' }).eq('id', this.sessionId);
+      try {
+        await supabase.from('sessions').update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        }).eq('id', this.sessionId);
+      } catch (err) {
+        console.error('Failed to update session status in Supabase:', err);
+      }
     }
   }
 

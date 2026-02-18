@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap, LogOut } from 'lucide-react';
+import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap, LogOut, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAgentStore } from '../stores/agentStore';
 import { MockAgentSimulator } from '../services/mockAgentService';
@@ -8,6 +8,9 @@ import { getOrchestrationService } from '../services/orchestrationService';
 import AgentMap from '../components/map/AgentMap';
 import PulseBar from '../components/timeline/PulseBar';
 import PresetSelector from '../components/PresetSelector';
+import ConfirmDialog from '../components/ConfirmDialog';
+import MissionHistory from '../components/MissionHistory';
+import CreditBalance from '../components/CreditBalance';
 import ThemeToggle from '../components/ThemeToggle';
 import { useAuthStore } from '../stores/authStore';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -97,16 +100,26 @@ export default function Demo() {
   const orchestratorRef = useRef(null);
   const [showPresetSelector, setShowPresetSelector] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [currentPreset, setCurrentPreset] = useState(null);
   const [useRealAI, setUseRealAI] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [focusedAgentId, setFocusedAgentId] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null); // null | { type, payload? }
   const startTimeRef = useRef(null);
 
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
 
+  const isMissionRunning = currentPreset && agents.some(
+    (a) => !['completed', 'failed'].includes(a.status)
+  );
+
   const handleSignOut = async () => {
+    if (isMissionRunning) {
+      setConfirmAction({ type: 'signout' });
+      return;
+    }
     await signOut();
     navigate('/login');
   };
@@ -176,14 +189,60 @@ export default function Demo() {
     }
   };
 
-  const handleReset = () => {
+  const doReset = async () => {
     simulatorRef.current?.stop();
-    orchestratorRef.current?.stop();
+    await orchestratorRef.current?.stop();
     reset();
     setCurrentPreset(null);
     setElapsedTime(0);
     setFocusedAgentId(null);
     setShowPresetSelector(true);
+  };
+
+  const handleReset = () => {
+    if (isMissionRunning) {
+      setConfirmAction({ type: 'reset' });
+      return;
+    }
+    doReset();
+  };
+
+  const handleNewMission = () => {
+    if (isMissionRunning) {
+      setConfirmAction({ type: 'newMission' });
+      return;
+    }
+    setShowPresetSelector(true);
+  };
+
+  const handleConfirmAction = async () => {
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (!action) return;
+
+    switch (action.type) {
+      case 'reset':
+        await doReset();
+        break;
+      case 'signout':
+        await doReset();
+        await signOut();
+        navigate('/login');
+        break;
+      case 'newMission':
+        await doReset();
+        setShowPresetSelector(true);
+        break;
+    }
+  };
+
+  const handleRelaunch = async (preset) => {
+    setShowHistory(false);
+    if (isMissionRunning) {
+      setConfirmAction({ type: 'newMission' });
+      return;
+    }
+    handleSelectPreset(preset);
   };
 
   const handleTogglePause = () => {
@@ -207,12 +266,34 @@ export default function Demo() {
     setFocusedAgentId(null);
   };
 
-  // Cleanup on unmount
+  // Warn before tab close/refresh during active mission
+  useEffect(() => {
+    if (!isMissionRunning) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isMissionRunning]);
+
+  // Reconnect to running orchestrator on mount (background execution)
+  useEffect(() => {
+    const orch = getOrchestrationService();
+    const status = orch.getStatus();
+    if (status.running && status.preset) {
+      orchestratorRef.current = orch;
+      setCurrentPreset(status.preset);
+      startTimeRef.current = status.startTime;
+      setElapsedTime(Date.now() - status.startTime);
+      setShowPresetSelector(false);
+    }
+  }, []);
+
+  // Cleanup only the mock simulator on unmount (orchestrator survives navigation)
   useEffect(() => {
     return () => {
       simulatorRef.current?.stop();
-      orchestratorRef.current?.stop();
-      reset();
     };
   }, []);
 
@@ -277,25 +358,46 @@ export default function Demo() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {currentPreset && (
-            <button
-              onClick={() => setShowPresetSelector(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                background: 'var(--theme-accent-muted)',
-                border: '1px solid var(--theme-accent-border)',
-                borderRadius: '6px',
-                color: 'var(--theme-accent)',
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
-            >
-              <Rocket size={14} />
-              New Mission
-            </button>
+            <>
+              <button
+                onClick={() => setShowHistory(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  border: '1px solid var(--theme-border)',
+                  borderRadius: '6px',
+                  color: 'var(--theme-text-secondary)',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                <History size={14} />
+                History
+              </button>
+              <button
+                onClick={handleNewMission}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  background: 'var(--theme-accent-muted)',
+                  border: '1px solid var(--theme-accent-border)',
+                  borderRadius: '6px',
+                  color: 'var(--theme-accent)',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Rocket size={14} />
+                New Mission
+              </button>
+            </>
           )}
+          {isSupabaseConfigured() && authUser && <CreditBalance />}
           <button
             onClick={() => setShowInfo(true)}
             style={{
@@ -423,6 +525,40 @@ export default function Demo() {
             onClose={() => {
               if (currentPreset) setShowPresetSelector(false);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation dialog */}
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={
+          confirmAction?.type === 'reset' ? 'Reset Mission?' :
+          confirmAction?.type === 'signout' ? 'Sign Out?' :
+          'Start New Mission?'
+        }
+        message={
+          confirmAction?.type === 'reset'
+            ? 'A mission is currently running. Resetting will stop all agents and discard their progress.'
+            : confirmAction?.type === 'signout'
+            ? 'A mission is currently running. Signing out will stop all agents and discard their progress.'
+            : 'A mission is currently running. Starting a new mission will stop all current agents.'
+        }
+        confirmLabel={
+          confirmAction?.type === 'signout' ? 'Sign Out' :
+          confirmAction?.type === 'reset' ? 'Reset' : 'Start New'
+        }
+        variant="danger"
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* Mission history */}
+      <AnimatePresence>
+        {showHistory && (
+          <MissionHistory
+            onClose={() => setShowHistory(false)}
+            onRelaunch={handleRelaunch}
           />
         )}
       </AnimatePresence>
