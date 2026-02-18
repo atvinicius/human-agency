@@ -6,10 +6,14 @@ export const useCreditStore = create((set, get) => ({
   loading: false,
   error: null,
   _refreshInterval: null,
+  _authUnsub: null,
 
   fetchBalance: async () => {
     const token = useAuthStore.getState().getAccessToken();
-    if (!token) return;
+    if (!token) {
+      console.warn('[credits] fetchBalance skipped — no access token yet');
+      return false;
+    }
 
     set({ loading: true });
     try {
@@ -19,8 +23,11 @@ export const useCreditStore = create((set, get) => ({
       if (!res.ok) throw new Error('Failed to fetch credits');
       const data = await res.json();
       set({ balance: data.balance, loading: false, error: null });
+      return true;
     } catch (err) {
+      console.error('[credits] fetchBalance failed:', err.message);
       set({ loading: false, error: err.message });
+      return false;
     }
   },
 
@@ -63,6 +70,14 @@ export const useCreditStore = create((set, get) => ({
     get().fetchBalance();
     const id = setInterval(() => get().fetchBalance(), 30_000);
     set({ _refreshInterval: id });
+
+    // When auth session appears (e.g. after page reload), fetch immediately
+    const unsub = useAuthStore.subscribe((state, prev) => {
+      if (state.session && !prev.session) {
+        get().fetchBalance();
+      }
+    });
+    set({ _authUnsub: unsub });
   },
 
   stopAutoRefresh: () => {
@@ -70,6 +85,11 @@ export const useCreditStore = create((set, get) => ({
     if (id) {
       clearInterval(id);
       set({ _refreshInterval: null });
+    }
+    const unsub = get()._authUnsub;
+    if (unsub) {
+      unsub();
+      set({ _authUnsub: null });
     }
   },
 }));
