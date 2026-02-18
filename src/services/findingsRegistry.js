@@ -75,6 +75,42 @@ export class FindingsRegistry {
     };
   }
 
+  getCollaborationGraph(agents) {
+    const edges = [];
+    // Parent→child context sharing
+    for (const agent of agents) {
+      const parentId = agent.parent_id || agent.parentId;
+      if (parentId) {
+        const parent = agents.find((a) => a.id === parentId);
+        if (parent) {
+          edges.push({
+            from: { id: parent.id, name: parent.name, role: parent.role },
+            to: { id: agent.id, name: agent.name, role: agent.role },
+            type: 'spawned',
+          });
+        }
+      }
+    }
+    // Completion flows: child→parent findings
+    for (const [agentId, completion] of Object.entries(this.completions)) {
+      const agent = agents.find((a) => a.id === agentId);
+      if (!agent) continue;
+      const parentId = agent.parent_id || agent.parentId;
+      if (parentId) {
+        const parent = agents.find((a) => a.id === parentId);
+        if (parent) {
+          edges.push({
+            from: { id: agent.id, name: agent.name, role: agent.role },
+            to: { id: parent.id, name: parent.name, role: parent.role },
+            type: 'findings',
+            timestamp: completion.timestamp,
+          });
+        }
+      }
+    }
+    return edges;
+  }
+
   reset() {
     this.findings = [];
     this.completions = {};

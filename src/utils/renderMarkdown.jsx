@@ -158,12 +158,18 @@ function renderInline(text) {
     const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/);
     // Inline code: `text`
     const codeMatch = remaining.match(/`([^`]+)`/);
+    // Markdown link: [text](url)
+    const linkMatch = remaining.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    // Bare URL: https://...
+    const urlMatch = remaining.match(/(?<!\[.*\]\()https?:\/\/[^\s<>"')\]]+/);
 
     // Find earliest match
     const matches = [
       boldMatch && { type: 'bold', match: boldMatch },
       italicMatch && { type: 'italic', match: italicMatch },
       codeMatch && { type: 'code', match: codeMatch },
+      linkMatch && { type: 'link', match: linkMatch },
+      urlMatch && { type: 'url', match: urlMatch },
     ].filter(Boolean);
 
     if (matches.length === 0) {
@@ -208,6 +214,41 @@ function renderInline(text) {
         >
           {earliest.match[1]}
         </code>
+      );
+    } else if (earliest.type === 'link') {
+      parts.push(
+        <a
+          key={`a-${key++}`}
+          href={earliest.match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--theme-accent)',
+            textDecoration: 'underline',
+            textUnderlineOffset: '2px',
+          }}
+        >
+          {earliest.match[1]}
+        </a>
+      );
+    } else if (earliest.type === 'url') {
+      const href = earliest.match[0].replace(/[.,;:!?)]+$/, '');
+      const display = href.length > 50 ? href.slice(0, 47) + '...' : href;
+      parts.push(
+        <a
+          key={`u-${key++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--theme-accent)',
+            textDecoration: 'underline',
+            textUnderlineOffset: '2px',
+            wordBreak: 'break-all',
+          }}
+        >
+          {display}
+        </a>
       );
     }
 
