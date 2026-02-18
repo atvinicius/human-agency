@@ -24,3 +24,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Migration with secrets (run manually via Supabase SQL Editor)
+supabase/migrations/004_background_scheduling.sql
