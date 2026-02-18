@@ -24,9 +24,17 @@ export async function checkCredits(userId) {
     .single();
 
   if (error || !data) {
-    // No credit record means the user hasn't activated credits yet —
-    // allow the call (credits not enforced for this user).
-    return null;
+    // No credit row — grant beta credits on first read
+    await supabaseAdmin
+      .from('user_credits')
+      .upsert({
+        user_id: userId,
+        balance: 10.0,
+        lifetime_earned: 10.0,
+        lifetime_spent: 0,
+      }, { onConflict: 'user_id', ignoreDuplicates: true });
+
+    return { allowed: true, balance: 10.0 };
   }
 
   return {

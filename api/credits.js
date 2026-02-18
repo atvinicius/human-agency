@@ -46,7 +46,19 @@ export default async function handler(req) {
       .single();
 
     if (error || !data) {
-      return new Response(JSON.stringify({ balance: 0, lifetime_earned: 0, lifetime_spent: 0 }), {
+      // No credit row — grant beta credits on first read
+      const { data: newData } = await supabaseAdmin
+        .from('user_credits')
+        .upsert({
+          user_id: authUser.id,
+          balance: 10.0,
+          lifetime_earned: 10.0,
+          lifetime_spent: 0,
+        }, { onConflict: 'user_id', ignoreDuplicates: true })
+        .select('balance, lifetime_earned, lifetime_spent')
+        .single();
+
+      return new Response(JSON.stringify(newData || { balance: 10, lifetime_earned: 10, lifetime_spent: 0 }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
