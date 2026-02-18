@@ -146,7 +146,7 @@ export default function Login() {
           >
             <CheckCircle
               size={48}
-              style={{ color: 'var(--theme-accent)', marginBottom: '16px' }}
+              style={{ color: 'var(--theme-accent)', marginBottom: '16px', display: 'block', margin: '0 auto 16px' }}
             />
             <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--theme-text-primary)', marginBottom: '8px' }}>
               Confirm your email
@@ -437,7 +437,7 @@ export default function Login() {
           >
             <CheckCircle
               size={48}
-              style={{ color: 'var(--theme-accent)', marginBottom: '16px' }}
+              style={{ color: 'var(--theme-accent)', marginBottom: '16px', display: 'block', margin: '0 auto 16px' }}
             />
             <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--theme-text-primary)', marginBottom: '8px' }}>
               Check your email
