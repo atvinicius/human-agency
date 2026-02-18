@@ -336,6 +336,10 @@ async function executeAgent(agentId, store, orchestrator) {
           agentName: currentAgent.name,
           role: currentAgent.role,
           content: outputStr,
+          thinking: result.thinking || null,
+          searchQueries: result.searches || [],
+          parentAgentId: currentAgent.parent_id || null,
+          objective: currentAgent.objective || null,
         });
       }
 
@@ -349,6 +353,8 @@ async function executeAgent(agentId, store, orchestrator) {
             title: artifact.name,
             content: artifact.content,
             type: 'artifact',
+            parentAgentId: currentAgent.parent_id || null,
+            objective: currentAgent.objective || null,
           });
         }
       }
@@ -367,6 +373,13 @@ async function executeAgent(agentId, store, orchestrator) {
             sourceId: 'external',
             targetId: agentId,
             type: 'search_result',
+          });
+          // Track in mission report
+          useMissionReportStore.getState().addSearchRecord({
+            agentId,
+            agentName: currentAgent.name,
+            query: search.query,
+            resultCount: search.resultCount || 0,
           });
         }
         // Track mission-level search count
