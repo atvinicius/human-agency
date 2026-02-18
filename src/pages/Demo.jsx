@@ -194,6 +194,8 @@ export default function Demo() {
     if (useRealAI) {
       orchestratorRef.current = getOrchestrationService();
       await orchestratorRef.current.startSession(preset);
+      // Refresh credit balance after mission planning
+      useCreditStore.getState().fetchBalance();
     } else {
       simulatorRef.current = new MockAgentSimulator(useAgentStore.getState());
       simulatorRef.current.store = useAgentStore.getState();
@@ -378,26 +380,30 @@ export default function Demo() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* History always visible when authenticated */}
+          {isSupabaseConfigured() && authUser && (
+            <button
+              onClick={() => setShowHistory(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                background: 'transparent',
+                border: '1px solid var(--theme-border)',
+                borderRadius: '6px',
+                color: 'var(--theme-text-secondary)',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              <History size={14} />
+              History
+            </button>
+          )}
+          {/* These only show during/after a mission */}
           {currentPreset && (
             <>
-              <button
-                onClick={() => setShowHistory(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  background: 'transparent',
-                  border: '1px solid var(--theme-border)',
-                  borderRadius: '6px',
-                  color: 'var(--theme-text-secondary)',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                <History size={14} />
-                History
-              </button>
               <button
                 onClick={() => setShowReport(true)}
                 style={{
@@ -538,6 +544,9 @@ export default function Demo() {
               left: '50%',
               transform: 'translate(-50%, -50%)',
               textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
             }}
           >
             <Rocket size={48} style={{ color: 'var(--theme-text-muted)', marginBottom: '16px' }} />

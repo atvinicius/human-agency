@@ -300,6 +300,9 @@ async function executeAgent(agentId, store, orchestrator) {
         })
       );
 
+      // Refresh credit balance after each agent call
+      useCreditStore.getState().fetchBalance();
+
       // Clear streaming text and apply final result
       store.updateAgent(agentId, {
         current_activity: result.activity || 'Processing...',
@@ -575,10 +578,24 @@ export class OrchestrationService {
           objective: preset.initial_objective,
           status: 'active',
           metadata: { preset_config: preset },
-          ...(userId && { user_id: userId }),
+          user_id: userId || null,
         });
       } catch (err) {
         console.error('Failed to create session in Supabase:', err);
+      }
+
+      // If userId wasn't available at creation, set it once auth resolves
+      if (!userId) {
+        const sessionId = this.sessionId;
+        const unsub = useAuthStore.subscribe((state) => {
+          if (state.user?.id && sessionId) {
+            supabase.from('sessions')
+              .update({ user_id: state.user.id })
+              .eq('id', sessionId)
+              .is('user_id', null)
+              .then(() => unsub());
+          }
+        });
       }
     }
 

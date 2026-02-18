@@ -382,22 +382,6 @@ export default function AgentMap({
         stats={stats}
       />
 
-      {/* Empty state */}
-      {simNodes.length === 0 && agents.length === 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            textAlign: 'center',
-            color: 'var(--theme-text-muted)',
-          }}
-        >
-          <p style={{ fontSize: '18px', marginBottom: '8px' }}>No agents running</p>
-          <p style={{ fontSize: '14px' }}>Agents will appear here as they spawn</p>
-        </div>
-      )}
     </div>
   );
 }

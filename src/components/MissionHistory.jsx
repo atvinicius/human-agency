@@ -264,6 +264,11 @@ export default function MissionHistory({ onClose, onRelaunch }) {
   const [selectedMissionId, setSelectedMissionId] = useState(null);
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     getMissionHistory(userId).then((data) => {
       setMissions(data);
       setLoading(false);
