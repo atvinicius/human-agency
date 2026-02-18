@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Loader, CheckCircle, Gift } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader, CheckCircle, Gift, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 export default function Login() {
@@ -24,6 +24,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [confirmationPending, setConfirmationPending] = useState(false);
+  const [showPromoField, setShowPromoField] = useState(false);
 
   // Redirect if already logged in (and verified)
   useEffect(() => {
@@ -256,7 +257,28 @@ export default function Login() {
                   style={inputStyle}
                 />
               </div>
-              {mode === 'signup' && (
+              {mode === 'signup' && !showPromoField && (
+                <button
+                  type="button"
+                  onClick={() => setShowPromoField(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--theme-text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '4px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Gift size={12} />
+                  Have a promo code?
+                  <ChevronDown size={12} />
+                </button>
+              )}
+              {mode === 'signup' && showPromoField && (
                 <div style={{ position: 'relative' }}>
                   <Gift size={16} style={iconStyle} />
                   <input
@@ -339,16 +361,38 @@ export default function Login() {
                   style={inputStyle}
                 />
               </div>
-              <div style={{ position: 'relative' }}>
-                <Gift size={16} style={iconStyle} />
-                <input
-                  type="text"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  placeholder="Promo code (optional)"
-                  style={inputStyle}
-                />
-              </div>
+              {!showPromoField ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPromoField(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--theme-text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '4px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Gift size={12} />
+                  Have a promo code?
+                  <ChevronDown size={12} />
+                </button>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <Gift size={16} style={iconStyle} />
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    placeholder="Promo code (optional)"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
             </div>
 
             <button

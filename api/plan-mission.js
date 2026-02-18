@@ -51,13 +51,14 @@ You MUST respond with ONLY a valid JSON object (no markdown, no explanation) wit
 
 Guidelines:
 - Start with a coordinator at the root
-- Use 5-25 agents total
+- You MUST produce between 5 and 15 agents total. No more than 15.
 - Each agent should have a specific, actionable objective
 - Group related work under sub-coordinators for complex missions
 - Include at least one validator
 - Include a synthesizer for the final output
 - Make names descriptive (e.g., "Market Research Analyst", not "Agent 1")
-- Make objectives specific (e.g., "Research competitor pricing models in the SaaS space", not "Do research")`;
+- Make objectives specific (e.g., "Research competitor pricing models in the SaaS space", not "Do research")
+- Maximum tree depth of 3 levels (root coordinator → specialists → sub-specialists)`;
 
 export default async function handler(req) {
   const corsHeaders = {

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap, LogOut, History } from 'lucide-react';
+import { ArrowLeft, Info, X, Rocket, Clock, Users, Zap, LogOut, History, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAgentStore } from '../stores/agentStore';
+import { useMissionReportStore } from '../stores/missionReportStore';
 import { MockAgentSimulator } from '../services/mockAgentService';
 import { getOrchestrationService } from '../services/orchestrationService';
 import AgentMap from '../components/map/AgentMap';
@@ -10,6 +11,8 @@ import PulseBar from '../components/timeline/PulseBar';
 import PresetSelector from '../components/PresetSelector';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MissionHistory from '../components/MissionHistory';
+import MissionReport from '../components/MissionReport';
+import BetaWelcome from '../components/BetaWelcome';
 import CreditBalance from '../components/CreditBalance';
 import ThemeToggle from '../components/ThemeToggle';
 import { useAuthStore } from '../stores/authStore';
@@ -106,10 +109,15 @@ export default function Demo() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [focusedAgentId, setFocusedAgentId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // null | { type, payload? }
+  const [showReport, setShowReport] = useState(false);
+  const [showBetaWelcome, setShowBetaWelcome] = useState(false);
   const startTimeRef = useRef(null);
 
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
+
+  const reportSectionCount = useMissionReportStore((s) => s.sections.length);
+  const reportStatus = useMissionReportStore((s) => s.status);
 
   const {
     agents,
@@ -141,6 +149,16 @@ export default function Demo() {
     await signOut();
     navigate('/login');
   };
+
+  // Show beta welcome for first-time users
+  useEffect(() => {
+    if (authUser && isSupabaseConfigured()) {
+      const seen = localStorage.getItem(`beta_welcome_seen_${authUser.id}`);
+      if (!seen) {
+        setShowBetaWelcome(true);
+      }
+    }
+  }, [authUser]);
 
   // Auto-focus on agents that need input
   const waitingAgent = agents.find((a) => a.pendingInput || a.pending_input);
@@ -193,9 +211,11 @@ export default function Demo() {
     simulatorRef.current?.stop();
     await orchestratorRef.current?.stop();
     reset();
+    useMissionReportStore.getState().reset();
     setCurrentPreset(null);
     setElapsedTime(0);
     setFocusedAgentId(null);
+    setShowReport(false);
     setShowPresetSelector(true);
   };
 
@@ -376,6 +396,41 @@ export default function Demo() {
               >
                 <History size={14} />
                 History
+              </button>
+              <button
+                onClick={() => setShowReport(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  background: reportStatus === 'complete' ? 'hsl(150, 70%, 50%, 0.1)' : 'transparent',
+                  border: `1px solid ${reportStatus === 'complete' ? 'hsl(150, 70%, 50%, 0.3)' : 'var(--theme-border)'}`,
+                  borderRadius: '6px',
+                  color: reportStatus === 'complete' ? 'hsl(150, 70%, 50%)' : 'var(--theme-text-secondary)',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                }}
+              >
+                <FileText size={14} />
+                View Output
+                {reportSectionCount > 0 && (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '1px 5px',
+                      background: 'var(--theme-accent)',
+                      color: 'var(--theme-accent-text)',
+                      borderRadius: '8px',
+                      minWidth: '16px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {reportSectionCount}
+                  </span>
+                )}
               </button>
               <button
                 onClick={handleNewMission}
@@ -559,6 +614,23 @@ export default function Demo() {
           <MissionHistory
             onClose={() => setShowHistory(false)}
             onRelaunch={handleRelaunch}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Mission report */}
+      <AnimatePresence>
+        {showReport && (
+          <MissionReport onClose={() => setShowReport(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Beta welcome modal */}
+      <AnimatePresence>
+        {showBetaWelcome && (
+          <BetaWelcome
+            userId={authUser?.id}
+            onDismiss={() => setShowBetaWelcome(false)}
           />
         )}
       </AnimatePresence>

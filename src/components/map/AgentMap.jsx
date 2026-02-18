@@ -3,6 +3,7 @@
 // SVG-only rendering with organic edges, ripples, annotations, and ambient glow
 
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { useAgentStore } from '../../stores/agentStore';
 import { select } from 'd3-selection';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import {
@@ -210,6 +211,15 @@ export default function AgentMap({
     }
   }, [onSelectAgent, focusedAgentId, onUnfocusAgent]);
 
+  // Subscribe to data transfers for edge visualization
+  const dataTransfers = useAgentStore((s) => s.dataTransfers);
+
+  // Filter out expired transfers (>3s old)
+  const activeTransfers = useMemo(() => {
+    const now = Date.now();
+    return dataTransfers.filter((t) => now - t.timestamp < 3000);
+  }, [dataTransfers]);
+
   // Compute connected IDs for spotlight effect
   const connectedIds = useMemo(() => {
     if (!selectedAgentId) return null;
@@ -299,6 +309,12 @@ export default function AgentMap({
               (sourceNode.id === selectedAgentId || targetNode.id === selectedAgentId);
             const isActive = sourceNode.status === 'working' && targetNode.status === 'working';
 
+            // Match active data transfers to this edge
+            const edgeFlows = activeTransfers.filter((t) =>
+              (t.sourceId === sourceNode.id && t.targetId === targetNode.id) ||
+              (t.sourceId === targetNode.id && t.targetId === sourceNode.id)
+            );
+
             return (
               <OrganicEdge
                 key={`${sourceNode.id}-${targetNode.id}`}
@@ -307,6 +323,7 @@ export default function AgentMap({
                 isHighlighted={isHighlighted}
                 isActive={isActive}
                 zoomK={transform.k}
+                dataFlows={edgeFlows}
               />
             );
           })}

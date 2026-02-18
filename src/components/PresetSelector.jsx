@@ -33,6 +33,7 @@ export default function PresetSelector({ onSelect, onClose }) {
   }, []);
 
   const categories = [...new Set(presets.map((p) => p.category))];
+  const showCategoryFilter = categories.length > 1;
   const filteredPresets = selectedCategory
     ? presets.filter((p) => p.category === selectedCategory)
     : presets;
@@ -402,7 +403,8 @@ export default function PresetSelector({ onSelect, onClose }) {
           </button>
         </div>
 
-        {/* Category filter */}
+        {/* Category filter — hidden when all presets share one category */}
+        {showCategoryFilter && (
         <div
           style={{
             padding: '16px 32px',
@@ -447,6 +449,7 @@ export default function PresetSelector({ onSelect, onClose }) {
             </button>
           ))}
         </div>
+        )}
 
         {/* Preset grid */}
         <div
@@ -469,9 +472,7 @@ export default function PresetSelector({ onSelect, onClose }) {
               }}
             >
               {/* Custom mission input — always shown at top */}
-              {!selectedCategory && (
-                <CustomMissionInput onSelect={onSelect} />
-              )}
+              <CustomMissionInput onSelect={onSelect} />
 
               <AnimatePresence mode="popLayout">
                 {filteredPresets.map((preset) => (

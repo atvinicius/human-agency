@@ -8,6 +8,10 @@ export const MODEL_PRICING = {
   },
 };
 
+export const SEARCH_PRICING = {
+  cost_per_search: 0.005, // $0.005 per web search query
+};
+
 export const RATE_LIMITS = {
   min_balance_to_start: 0.01,
 };

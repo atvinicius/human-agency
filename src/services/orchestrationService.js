@@ -2,12 +2,23 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAgentStore } from '../stores/agentStore';
 import { useAuthStore } from '../stores/authStore';
 import { useCreditStore } from '../stores/creditStore';
+import { useMissionReportStore } from '../stores/missionReportStore';
 import { RequestQueue } from './requestQueue';
 import { shouldCompress, compressContext } from './contextCompressor';
 import { parseDataStream, parseAgentResponse } from './streamParser';
+import { FindingsRegistry } from './findingsRegistry';
 
 // Shared request queue — 3 concurrent LLM calls, priority-ordered
 const requestQueue = new RequestQueue({ concurrency: 3 });
+
+// Mission budget defaults
+const DEFAULT_BUDGET = {
+  maxTotalAgents: 25,
+  maxDepth: 4,
+  maxSpawnsPerAgent: 3,
+  softCap: 20,
+  maxSearchesPerMission: 30,
+};
 
 // Build auth headers from current session
 function getAuthHeaders() {
@@ -59,8 +70,50 @@ async function callAgentStream(agent, messages, onDelta) {
   return { result, usage: null };
 }
 
+// Check if an agent can spawn children
+function canSpawn(orchestrator, parentAgentId, store) {
+  const budget = orchestrator.missionBudget;
+  const agents = store.agents;
+
+  // Hard cap on total agents
+  if (agents.length >= budget.maxTotalAgents) {
+    return { allowed: false, remaining: 0, depth: 0, reason: 'Maximum agent limit reached' };
+  }
+
+  // Compute depth by walking parent chain
+  let depth = 0;
+  let currentId = parentAgentId;
+  while (currentId) {
+    const parent = agents.find((a) => a.id === currentId);
+    if (!parent) break;
+    currentId = parent.parent_id || parent.parentId;
+    depth++;
+    if (depth > budget.maxDepth + 1) break; // safety
+  }
+
+  if (depth >= budget.maxDepth) {
+    return { allowed: false, remaining: 0, depth, reason: 'Maximum depth reached' };
+  }
+
+  // Count existing children of this parent
+  const childCount = agents.filter(
+    (a) => a.parent_id === parentAgentId || a.parentId === parentAgentId
+  ).length;
+
+  if (childCount >= budget.maxSpawnsPerAgent) {
+    return { allowed: false, remaining: 0, depth, reason: 'Maximum children per agent reached' };
+  }
+
+  const remaining = Math.min(
+    budget.maxTotalAgents - agents.length,
+    budget.maxSpawnsPerAgent - childCount
+  );
+
+  return { allowed: true, remaining, depth, reason: null };
+}
+
 // Create agent from config
-function createAgentFromConfig(config, sessionId, parentId = null) {
+function createAgentFromConfig(config, sessionId, parentId = null, depth = 0) {
   return {
     id: crypto.randomUUID(),
     session_id: sessionId,
@@ -74,12 +127,13 @@ function createAgentFromConfig(config, sessionId, parentId = null) {
     current_activity: 'Initializing...',
     context: config.context || {},
     model: config.model || 'moonshotai/kimi-k2',
+    _depth: depth,
   };
 }
 
 // Recursively spawn agents from config tree
-async function spawnAgentTree(config, sessionId, parentId = null, store) {
-  const agent = createAgentFromConfig(config, sessionId, parentId);
+async function spawnAgentTree(config, sessionId, parentId = null, store, depth = 0) {
+  const agent = createAgentFromConfig(config, sessionId, parentId, depth);
 
   // Add to store
   store.addAgent(agent);
@@ -103,7 +157,8 @@ async function spawnAgentTree(config, sessionId, parentId = null, store) {
         { ...childConfig, objective: childConfig.objective || agent.objective },
         sessionId,
         agent.id,
-        store
+        store,
+        depth + 1
       );
     }
   }
@@ -122,6 +177,11 @@ async function executeAgent(agentId, store, orchestrator) {
     current_activity: 'Analyzing objective...',
   });
 
+  // Build initial context with parent info
+  const parentAgent = agent.parent_id
+    ? store.getAgentById(agent.parent_id)
+    : null;
+
   // Get conversation history
   let messages = [
     {
@@ -129,6 +189,9 @@ async function executeAgent(agentId, store, orchestrator) {
       content: `Begin working on your objective: ${agent.objective}`,
     },
   ];
+
+  // Track last completion check timestamp for incremental updates
+  let lastCompletionCheck = Date.now();
 
   // Execution loop
   let iterations = 0;
@@ -160,12 +223,68 @@ async function executeAgent(agentId, store, orchestrator) {
         );
       }
 
+      // === Collaboration: inject child completions ===
+      if (orchestrator.findingsRegistry) {
+        const childIds = store.agents
+          .filter((a) => a.parent_id === agentId || a.parentId === agentId)
+          .map((a) => a.id);
+
+        const newCompletions = orchestrator.findingsRegistry.getNewCompletionsSince(
+          childIds, lastCompletionCheck
+        );
+
+        if (newCompletions.length > 0) {
+          const completionSummaries = newCompletions.map((c) => {
+            const childAgent = store.getAgentById(c.agentId);
+            const name = childAgent?.name || 'Agent';
+            const output = c.output.length > 300 ? c.output.slice(0, 300) + '...' : c.output;
+            return `${name}: ${output}`;
+          }).join('\n\n');
+
+          messages.push({
+            role: 'user',
+            content: `Child agent(s) completed with findings:\n${completionSummaries}\n\nIncorporate these findings into your work.`,
+          });
+          lastCompletionCheck = Date.now();
+        }
+
+        // Sibling awareness every 3rd iteration
+        if (iterations % 3 === 0 && (currentAgent.parent_id || currentAgent.parentId)) {
+          const siblingFindings = orchestrator.findingsRegistry.getSiblingFindings(
+            agentId,
+            currentAgent.parent_id || currentAgent.parentId,
+            store.agents
+          );
+          if (siblingFindings.length > 0) {
+            messages.push({
+              role: 'user',
+              content: `Team update — your sibling agents have found:\n${siblingFindings.join('\n')}\nAvoid duplicating this work.`,
+            });
+          }
+        }
+      }
+
+      // Build spawn budget for context injection
+      const spawnCheck = canSpawn(orchestrator, agentId, store);
+      const agentWithBudget = {
+        ...currentAgent,
+        context: {
+          ...currentAgent.context,
+          spawn_budget: {
+            remaining: spawnCheck.remaining,
+            depth: spawnCheck.depth,
+            maxDepth: orchestrator.missionBudget.maxDepth,
+            nearLimit: store.agents.length >= orchestrator.missionBudget.softCap,
+          },
+        },
+      };
+
       // Call AI through priority queue with streaming
       let streamingText = '';
       const { result, usage } = await requestQueue.enqueue(
         agentId,
         currentAgent.priority || 'normal',
-        () => callAgentStream(currentAgent, messages, (delta, accumulated) => {
+        () => callAgentStream(agentWithBudget, messages, (delta, accumulated) => {
           // Live UI updates as stream arrives
           streamingText = accumulated;
           // Throttle UI updates to every ~100 chars
@@ -199,18 +318,107 @@ async function executeAgent(agentId, store, orchestrator) {
         content: JSON.stringify(result),
       });
 
+      // === Register findings ===
+      if (orchestrator.findingsRegistry && result.output && String(result.output).length > 50) {
+        orchestrator.findingsRegistry.addFinding(
+          agentId, currentAgent.name, currentAgent.role, result.output
+        );
+      }
+
+      // === Feed into mission report ===
+      if (result.output && String(result.output).length > 50) {
+        const outputStr = typeof result.output === 'string' ? result.output : JSON.stringify(result.output);
+        useMissionReportStore.getState().addSection({
+          agentId,
+          agentName: currentAgent.name,
+          role: currentAgent.role,
+          content: outputStr,
+        });
+      }
+
+      // Register artifacts in report
+      if (result.artifacts && result.artifacts.length > 0) {
+        for (const artifact of result.artifacts) {
+          useMissionReportStore.getState().addSection({
+            agentId,
+            agentName: currentAgent.name,
+            role: currentAgent.role,
+            title: artifact.name,
+            content: artifact.content,
+            type: 'artifact',
+          });
+        }
+      }
+
+      // === Handle search events ===
+      if (result.searches && result.searches.length > 0) {
+        for (const search of result.searches) {
+          store.addEvent({
+            type: 'search',
+            agentId,
+            agentName: currentAgent.name,
+            message: `Searched: "${search.query}" (${search.resultCount || 0} results)`,
+          });
+          // Data transfer for search visualization
+          store.addDataTransfer({
+            sourceId: 'external',
+            targetId: agentId,
+            type: 'search_result',
+          });
+        }
+        // Track mission-level search count
+        orchestrator.searchCount = (orchestrator.searchCount || 0) + result.searches.length;
+      }
+
       // Handle spawn requests
       if (result.spawn_agents && result.spawn_agents.length > 0) {
-        for (const spawnConfig of result.spawn_agents) {
-          const childAgent = createAgentFromConfig(spawnConfig, currentAgent.session_id, agentId);
-          store.addAgent(childAgent);
+        const spawnResult = canSpawn(orchestrator, agentId, store);
+        if (spawnResult.allowed) {
+          // Clamp to remaining capacity
+          const agentsToSpawn = result.spawn_agents.slice(0, spawnResult.remaining);
 
-          // Start child execution asynchronously, tracking the timeout
-          const timeoutId = setTimeout(() => {
-            orchestrator.childTimeouts.delete(timeoutId);
-            executeAgent(childAgent.id, store, orchestrator);
-          }, 1000);
-          orchestrator.childTimeouts.add(timeoutId);
+          for (const spawnConfig of agentsToSpawn) {
+            const childAgent = createAgentFromConfig(
+              spawnConfig,
+              currentAgent.session_id,
+              agentId,
+              (currentAgent._depth || 0) + 1
+            );
+
+            // Inject parent context into child
+            childAgent.context = {
+              ...childAgent.context,
+              parent_objective: currentAgent.objective,
+              parent_findings: String(result.output || '').slice(0, 500),
+              spawn_budget: {
+                remaining: Math.max(0, spawnResult.remaining - agentsToSpawn.indexOf(spawnConfig) - 1),
+                depth: spawnResult.depth + 1,
+                maxDepth: orchestrator.missionBudget.maxDepth,
+              },
+            };
+
+            store.addAgent(childAgent);
+
+            // Data transfer: context sharing
+            store.addDataTransfer({
+              sourceId: agentId,
+              targetId: childAgent.id,
+              type: 'context',
+            });
+
+            // Start child execution asynchronously, tracking the timeout
+            const timeoutId = setTimeout(() => {
+              orchestrator.childTimeouts.delete(timeoutId);
+              executeAgent(childAgent.id, store, orchestrator);
+            }, 1000);
+            orchestrator.childTimeouts.add(timeoutId);
+          }
+        } else {
+          // Can't spawn — tell agent to do work itself
+          messages.push({
+            role: 'user',
+            content: `Cannot spawn additional agents: ${spawnResult.reason}. Complete your objective with your own analysis instead.`,
+          });
         }
       }
 
@@ -243,6 +451,23 @@ async function executeAgent(agentId, store, orchestrator) {
           progress: 100,
           current_activity: 'Objective complete',
         });
+
+        // Register completion in findings registry
+        if (orchestrator.findingsRegistry) {
+          orchestrator.findingsRegistry.registerCompletion(agentId, result.output || '');
+        }
+
+        // Data transfer: findings flow up to parent
+        if (currentAgent.parent_id) {
+          store.addDataTransfer({
+            sourceId: agentId,
+            targetId: currentAgent.parent_id,
+            type: 'findings',
+          });
+        }
+
+        // Check if mission is complete
+        orchestrator._checkMissionComplete();
         break;
       }
 
@@ -273,7 +498,26 @@ async function executeAgent(agentId, store, orchestrator) {
         status: 'failed',
         current_activity: `Error: ${error.message}`,
       });
+
+      // Check mission complete even on failure
+      orchestrator._checkMissionComplete();
       break;
+    }
+  }
+
+  // If we hit max iterations, mark as completed
+  if (iterations >= maxIterations) {
+    const finalAgent = store.getAgentById(agentId);
+    if (finalAgent && finalAgent.status === 'working') {
+      store.updateAgent(agentId, {
+        status: 'completed',
+        progress: 100,
+        current_activity: 'Max iterations reached',
+      });
+      if (orchestrator.findingsRegistry) {
+        orchestrator.findingsRegistry.registerCompletion(agentId, finalAgent.context?.lastOutput || '');
+      }
+      orchestrator._checkMissionComplete();
     }
   }
 }
@@ -287,6 +531,10 @@ export class OrchestrationService {
     this.currentPreset = null;
     this.startTime = null;
     this.childTimeouts = new Set();
+    this.findingsRegistry = null;
+    this.missionBudget = { ...DEFAULT_BUDGET };
+    this.searchCount = 0;
+    this._synthesisTriggered = false;
 
     // Subscribe to store changes
     useAgentStore.subscribe((state) => {
@@ -308,6 +556,13 @@ export class OrchestrationService {
     this.currentPreset = preset;
     this.startTime = Date.now();
     this.sessionId = crypto.randomUUID();
+    this.findingsRegistry = new FindingsRegistry();
+    this.missionBudget = { ...DEFAULT_BUDGET };
+    this.searchCount = 0;
+    this._synthesisTriggered = false;
+
+    // Reset report store
+    useMissionReportStore.getState().reset();
 
     // Create session in Supabase
     if (isSupabaseConfigured()) {
@@ -336,7 +591,8 @@ export class OrchestrationService {
         },
         this.sessionId,
         null,
-        this.store
+        this.store,
+        0
       );
     }
 
@@ -347,6 +603,98 @@ export class OrchestrationService {
     }
 
     return this.sessionId;
+  }
+
+  _checkMissionComplete() {
+    if (this._synthesisTriggered) return;
+
+    const agents = this.store.agents;
+    if (agents.length === 0) return;
+
+    const allDone = agents.every((a) =>
+      ['completed', 'failed'].includes(a.status)
+    );
+
+    if (allDone) {
+      this._triggerSynthesis();
+    }
+  }
+
+  async _triggerSynthesis() {
+    if (this._synthesisTriggered) return;
+    this._synthesisTriggered = true;
+
+    useMissionReportStore.getState().setStatus('synthesizing');
+
+    // Emit synthesis data transfers from completed agents
+    const completedAgents = this.store.agents.filter((a) => a.status === 'completed');
+    const synthesizerAgent = this.store.agents.find((a) => a.role === 'synthesizer');
+    if (synthesizerAgent) {
+      for (const agent of completedAgents) {
+        if (agent.id !== synthesizerAgent.id) {
+          this.store.addDataTransfer({
+            sourceId: agent.id,
+            targetId: synthesizerAgent.id,
+            type: 'synthesis',
+          });
+        }
+      }
+    }
+
+    // Gather all completions
+    const allOutputs = completedAgents
+      .map((a) => {
+        const completion = this.findingsRegistry?.completions[a.id];
+        return completion
+          ? `## ${a.name} (${a.role})\n${completion.output}`
+          : null;
+      })
+      .filter(Boolean)
+      .join('\n\n---\n\n');
+
+    if (!allOutputs) {
+      useMissionReportStore.getState().setSynthesis('No agent outputs to synthesize.');
+      return;
+    }
+
+    // Try LLM synthesis call
+    try {
+      const synthAgent = {
+        role: 'synthesizer',
+        name: 'Final Synthesizer',
+        objective: `Synthesize all agent findings into a comprehensive, well-structured markdown report for: ${this.currentPreset?.initial_objective || 'the mission objective'}`,
+        model: 'moonshotai/kimi-k2',
+        context: {},
+      };
+
+      const synthMessages = [
+        {
+          role: 'user',
+          content: `Here are the findings from all agents:\n\n${allOutputs.slice(0, 8000)}\n\nSynthesize these into a comprehensive, well-structured markdown report. Include key findings, analysis, and conclusions. Output ONLY the markdown report text, no JSON wrapper.`,
+        },
+      ];
+
+      const response = await fetch('/api/agent-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ agent: synthAgent, messages: synthMessages }),
+      });
+
+      if (response.ok) {
+        const fullText = await parseDataStream(response, () => {});
+        // Use the raw text if it doesn't look like JSON
+        const synthesisText = fullText.trim().startsWith('{')
+          ? (parseAgentResponse(fullText).output || fullText)
+          : fullText;
+        useMissionReportStore.getState().setSynthesis(synthesisText);
+      } else {
+        // Fallback: concatenated output
+        useMissionReportStore.getState().setSynthesis(allOutputs);
+      }
+    } catch (err) {
+      console.error('Synthesis failed, using fallback:', err);
+      useMissionReportStore.getState().setSynthesis(allOutputs);
+    }
   }
 
   async stop() {
@@ -360,6 +708,11 @@ export class OrchestrationService {
       clearTimeout(timeoutId);
     }
     this.childTimeouts.clear();
+
+    // Reset findings registry
+    if (this.findingsRegistry) {
+      this.findingsRegistry.reset();
+    }
 
     // Mark session as completed
     if (isSupabaseConfigured() && this.sessionId) {

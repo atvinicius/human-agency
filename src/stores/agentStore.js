@@ -34,6 +34,7 @@ export const useAgentStore = create((set, get) => ({
   agents: [],
   selectedAgentId: null,
   events: [],
+  dataTransfers: [],
   isPaused: false,
   eventFilter: 'normal', // minimum importance level to show
   filters: {
@@ -248,6 +249,32 @@ export const useAgentStore = create((set, get) => ({
     }));
   },
 
+  // Data transfers for visualization
+  addDataTransfer: (transfer) =>
+    set((state) => ({
+      dataTransfers: [
+        { id: Date.now() + Math.random(), ...transfer, timestamp: Date.now() },
+        ...state.dataTransfers,
+      ].slice(0, 50),
+    })),
+
+  // Programmatic event emitter (for search events, etc.)
+  addEvent: ({ type, agentId, agentName, message, importance }) =>
+    set((state) => ({
+      events: [
+        {
+          id: Date.now() + Math.random(),
+          type,
+          agentId,
+          agentName,
+          message,
+          timestamp: new Date(),
+          importance: importance || classifyEventImportance(type),
+        },
+        ...state.events,
+      ].slice(0, 100),
+    })),
+
   // Event filter
   setEventFilter: (minImportance) => set({ eventFilter: minImportance }),
 
@@ -266,6 +293,7 @@ export const useAgentStore = create((set, get) => ({
       agents: [],
       selectedAgentId: null,
       events: [],
+      dataTransfers: [],
       isPaused: false,
       eventFilter: 'normal',
       filters: { roles: [], statuses: [], priorities: [] },
@@ -294,7 +322,7 @@ export const useAgentStore = create((set, get) => ({
 
   getAgentById: (id) => get().agents.find((a) => a.id === id),
 
-  getChildAgents: (parentId) => get().agents.filter((a) => a.parentId === parentId),
+  getChildAgents: (parentId) => get().agents.filter((a) => a.parentId === parentId || a.parent_id === parentId),
 
   getStats: () => {
     const agents = get().agents;

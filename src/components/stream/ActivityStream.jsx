@@ -10,6 +10,7 @@ import {
   AlertCircle,
   X,
   AlertTriangle,
+  Search,
 } from 'lucide-react';
 
 const eventIcons = {
@@ -21,6 +22,7 @@ const eventIcons = {
   activity: Activity,
   status: AlertCircle,
   error: X,
+  search: Search,
 };
 
 const eventColors = {
@@ -32,6 +34,7 @@ const eventColors = {
   activity: 'var(--theme-text-secondary)',
   status: 'var(--theme-text-secondary)',
   error: 'hsl(0, 70%, 50%)',
+  search: 'hsl(210, 70%, 60%)',
 };
 
 // Visual treatment per importance level

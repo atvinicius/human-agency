@@ -1,10 +1,13 @@
 // Streaming Edge Function for AI Agent Execution
 // Uses Vercel AI SDK for Server-Sent Events streaming
+// Supports web search tool for researcher/coordinator roles
 
-import { streamText } from 'ai';
+import { streamText, tool } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { z } from 'zod';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
 import { checkCredits, deductCredits } from './_middleware/credits.js';
+import { webSearch } from './search.js';
 
 export const config = {
   runtime: 'edge',
@@ -16,7 +19,7 @@ const openrouter = createOpenRouter({
   apiKey: OPENROUTER_API_KEY,
 });
 
-// System prompts for different agent roles (shared with agent.js)
+// System prompts for different agent roles
 const ROLE_PROMPTS = {
   coordinator: `You are a Coordinator agent in an AI orchestration system. Your role is to:
 - Break down complex objectives into manageable sub-tasks
@@ -109,12 +112,32 @@ export default async function handler(req) {
       }
     }
 
+    // Build spawn constraints section for system prompt
+    const spawnBudget = agent.context?.spawn_budget;
+    let spawnConstraints = '';
+    if (spawnBudget) {
+      spawnConstraints = `\n\nSpawning constraints:
+- Remaining agent slots: ${spawnBudget.remaining}
+- Current depth: ${spawnBudget.depth} / ${spawnBudget.maxDepth}${spawnBudget.nearLimit ? '\n- Agent budget is running low. Focus on completing your work rather than spawning.' : ''}
+- Prefer doing work yourself over delegating when possible.`;
+    }
+
+    // Build search tool instruction for eligible roles
+    const hasSearch = ['researcher', 'coordinator'].includes(agent.role) && process.env.SERPER_API_KEY;
+    let searchInstruction = '';
+    if (hasSearch) {
+      searchInstruction = `\n\nYou have access to a webSearch tool for current information.
+Search for facts, data, and recent developments relevant to your objective.
+After gathering information, produce your JSON response.
+If you used web search, include a "searches" array in your JSON: [{"query": "...", "resultCount": N}]`;
+    }
+
     const systemPrompt = `${ROLE_PROMPTS[agent.role] || ROLE_PROMPTS.executor}
 
 Current Objective: ${agent.objective}
 
 Context:
-${JSON.stringify(agent.context || {}, null, 2)}
+${JSON.stringify(agent.context || {}, null, 2)}${spawnConstraints}${searchInstruction}
 
 Respond with a JSON object containing:
 - "thinking": Your reasoning process (string)
@@ -128,10 +151,36 @@ Respond with a JSON object containing:
 
     const model = openrouter(agent.model || 'moonshotai/kimi-k2');
 
+    // Build tools — only researchers and coordinators get search
+    let searchCount = 0;
+    const agentTools = hasSearch
+      ? {
+          webSearch: tool({
+            description: 'Search the web for current information relevant to your research objective.',
+            parameters: z.object({
+              query: z.string().describe('Search query — be specific and targeted'),
+            }),
+            execute: async ({ query }) => {
+              searchCount++;
+              if (searchCount > 5) {
+                return { error: 'Search limit reached for this call. Produce your findings now.' };
+              }
+              try {
+                return await webSearch(query);
+              } catch (err) {
+                return { error: `Search failed: ${err.message}`, results: [] };
+              }
+            },
+          }),
+        }
+      : {};
+
     const result = streamText({
       model,
       system: systemPrompt,
       messages,
+      tools: agentTools,
+      maxSteps: hasSearch ? 3 : 1,
       temperature: 0.7,
       maxTokens: 2000,
       onFinish: async ({ usage }) => {

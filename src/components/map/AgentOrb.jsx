@@ -28,6 +28,10 @@ function AgentOrb({
   const attentionRing = getAttentionRing(agent);
   const spotlightOpacity = getSpotlightOpacity(id, selectedAgentId, connectedIds);
 
+  // Detect if agent is actively searching
+  const isSearching = agent.current_activity?.toLowerCase().includes('search') ||
+    agent.currentActivity?.toLowerCase().includes('search');
+
   // Unique IDs for SVG defs scoped to this orb
   const gradientId = `orb-grad-${id}`;
   const glowFilterId = `orb-glow-${id}`;
@@ -79,6 +83,27 @@ function AgentOrb({
         opacity={0.15 * brightness}
         filter={`url(#${glowFilterId})`}
       />
+
+      {/* Search ring (rotating dashed blue ring when searching) */}
+      {isSearching && (
+        <circle
+          r={radius + 12}
+          fill="none"
+          stroke="hsl(210, 70%, 60%)"
+          strokeWidth={1.5}
+          strokeDasharray="6 4"
+          opacity={0.7}
+        >
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0"
+            to="360"
+            dur="1.5s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      )}
 
       {/* Attention ring (rotating dashes for pendingInput) */}
       {attentionRing && (
@@ -197,6 +222,8 @@ export default React.memo(AgentOrb, (prev, next) => {
     prev.agent.progress === next.agent.progress &&
     prev.agent.pendingInput === next.agent.pendingInput &&
     prev.agent.pending_input === next.agent.pending_input &&
+    prev.agent.current_activity === next.agent.current_activity &&
+    prev.agent.currentActivity === next.agent.currentActivity &&
     prev.isSelected === next.isSelected &&
     prev.selectedAgentId === next.selectedAgentId &&
     prev.zoomK === next.zoomK

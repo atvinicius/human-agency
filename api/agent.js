@@ -190,13 +190,23 @@ export default async function handler(req) {
       }
     }
 
+    // Build spawn constraints section for system prompt
+    const spawnBudget = agent.context?.spawn_budget;
+    let spawnConstraints = '';
+    if (spawnBudget) {
+      spawnConstraints = `\n\nSpawning constraints:
+- Remaining agent slots: ${spawnBudget.remaining}
+- Current depth: ${spawnBudget.depth} / ${spawnBudget.maxDepth}${spawnBudget.nearLimit ? '\n- Agent budget is running low. Focus on completing your work rather than spawning.' : ''}
+- Prefer doing work yourself over delegating when possible.`;
+    }
+
     // Build system prompt based on role
     const systemPrompt = `${ROLE_PROMPTS[agent.role] || ROLE_PROMPTS.executor}
 
 Current Objective: ${agent.objective}
 
 Context:
-${JSON.stringify(agent.context || {}, null, 2)}
+${JSON.stringify(agent.context || {}, null, 2)}${spawnConstraints}
 
 Respond with a JSON object containing:
 - "thinking": Your reasoning process (string)

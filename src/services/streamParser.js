@@ -1,5 +1,6 @@
 // Parse streaming text responses from Vercel AI SDK toTextStreamResponse()
 // The stream sends raw text chunks — no protocol framing needed.
+// With multi-step tool calls, intermediate text may appear before final JSON.
 
 /**
  * Read a streaming text response and call onDelta with each chunk.
@@ -28,7 +29,8 @@ export async function parseDataStream(response, onDelta) {
 
 /**
  * Parse the accumulated streaming text as a structured agent response JSON.
- * Falls back to a default structure if parsing fails.
+ * Enhanced to handle multi-step tool responses where intermediate text
+ * may appear before the final JSON block.
  *
  * @param {string} text - Full accumulated text from stream
  * @returns {object} Parsed agent response
@@ -45,9 +47,21 @@ export function parseAgentResponse(text) {
     }
   }
 
+  // Try direct parse first
   try {
     return JSON.parse(jsonText);
   } catch {
+    // Try to extract the last valid JSON object from the text
+    // This handles multi-step tool call output where text precedes JSON
+    const lastJson = extractLastJsonObject(jsonText);
+    if (lastJson) {
+      try {
+        return JSON.parse(lastJson);
+      } catch {
+        // Fall through to fallback
+      }
+    }
+
     // Fallback: treat the whole text as output
     return {
       thinking: 'Processing...',
@@ -57,4 +71,34 @@ export function parseAgentResponse(text) {
       complete: false,
     };
   }
+}
+
+/**
+ * Extract the last complete JSON object {...} from a string.
+ * Handles nested braces correctly.
+ */
+function extractLastJsonObject(text) {
+  let depth = 0;
+  let end = -1;
+  let start = -1;
+
+  // Scan backwards for the last closing brace
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] === '}') {
+      if (end === -1) end = i;
+      depth++;
+    } else if (text[i] === '{') {
+      depth--;
+      if (depth === 0) {
+        start = i;
+        break;
+      }
+    }
+  }
+
+  if (start !== -1 && end !== -1 && start < end) {
+    return text.slice(start, end + 1);
+  }
+
+  return null;
 }
