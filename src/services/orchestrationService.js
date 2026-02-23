@@ -564,6 +564,7 @@ export class OrchestrationService {
     this.searchCount = 0;
     this._synthesisTriggered = false;
     this._serverSide = false;
+    this._iterateInterval = null;
 
     // Subscribe to store changes
     useAgentStore.subscribe((state) => {
@@ -647,22 +648,21 @@ export class OrchestrationService {
     }
 
     if (this._serverSide && isSupabaseConfigured()) {
-      // Try to enable pg_cron job for server-side orchestration
-      const { error } = await supabase.rpc('enable_orchestration');
-      if (error) {
-        // pg_cron not available (migration 005 not applied, or extension not enabled).
-        // Fall back to client-side execution which is the proven, working path.
-        console.warn('Server-side orchestration unavailable, using client-side:', error.message);
-        this._serverSide = false;
-      } else {
-        // pg_cron enabled — subscribe to Realtime for live DB updates
-        useAgentStore.getState().subscribeToSession(this.sessionId);
-        useMissionReportStore.getState().subscribeToSession(this.sessionId);
-      }
-    }
+      // Subscribe to Realtime for live UI updates from DB changes
+      useAgentStore.getState().subscribeToSession(this.sessionId);
+      useMissionReportStore.getState().subscribeToSession(this.sessionId);
 
-    if (!this._serverSide) {
-      // Client-side mode: run executeAgent locally
+      // Enable pg_cron for background execution (continues if user closes browser)
+      supabase.rpc('enable_orchestration').then(({ error }) => {
+        if (error) console.warn('pg_cron orchestration not available (background execution disabled):', error.message);
+      });
+
+      // Client-driven polling: call /api/iterate directly for immediate feedback.
+      // This is the primary iteration driver. pg_cron is redundancy/background.
+      // claim_agent_for_iteration uses FOR UPDATE SKIP LOCKED, so both can run safely.
+      this._startIteratePolling();
+    } else {
+      // Pure client-side mode (no Supabase): run executeAgent locally
       const rootAgent = this.store.agents.find((a) => !a.parent_id);
       if (rootAgent) {
         executeAgent(rootAgent.id, this.store, this);
@@ -705,6 +705,7 @@ export class OrchestrationService {
     if (['active', 'synthesizing'].includes(session.status)) {
       useAgentStore.getState().subscribeToSession(sessionId);
       useMissionReportStore.getState().subscribeToSession(sessionId);
+      this._startIteratePolling();
     }
 
     // If paused, reactivate
@@ -713,9 +714,72 @@ export class OrchestrationService {
       this.running = true;
       useAgentStore.getState().subscribeToSession(sessionId);
       useMissionReportStore.getState().subscribeToSession(sessionId);
+      this._startIteratePolling();
     }
 
     return session;
+  }
+
+  _startIteratePolling() {
+    if (this._iterateInterval) return;
+
+    const poll = async () => {
+      if (!this.running || !this.sessionId) {
+        this._stopIteratePolling();
+        return;
+      }
+
+      try {
+        const token = useAuthStore.getState().getAccessToken();
+        const response = await fetch('/api/iterate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ sessionId: this.sessionId }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          if (response.status === 402) {
+            // Insufficient credits — pause and stop polling
+            console.warn('[iterate] Insufficient credits');
+            useCreditStore.getState().fetchBalance();
+            this._stopIteratePolling();
+            return;
+          }
+          console.error('[iterate] Server error:', err.error || response.status);
+          return;
+        }
+
+        const result = await response.json();
+
+        // Refresh credit balance after each iteration
+        if (result.action === 'iterated' || result.action === 'completed' || result.action === 'synthesized') {
+          useCreditStore.getState().fetchBalance();
+        }
+
+        // Mission complete — stop polling
+        if (result.action === 'synthesized') {
+          this._stopIteratePolling();
+        }
+      } catch (err) {
+        console.error('[iterate] Poll failed:', err.message);
+      }
+    };
+
+    // Kick off the first iteration immediately
+    poll();
+    // Then poll every 5 seconds
+    this._iterateInterval = setInterval(poll, 5000);
+  }
+
+  _stopIteratePolling() {
+    if (this._iterateInterval) {
+      clearInterval(this._iterateInterval);
+      this._iterateInterval = null;
+    }
   }
 
   _checkMissionComplete() {
@@ -886,6 +950,9 @@ Rules:
     this.currentPreset = null;
     this.startTime = null;
     requestQueue.cancelAll();
+
+    // Stop client-side iterate polling
+    this._stopIteratePolling();
 
     // Clear all pending child agent timeouts
     for (const timeoutId of this.childTimeouts) {

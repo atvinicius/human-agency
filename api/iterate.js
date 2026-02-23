@@ -195,14 +195,33 @@ export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Orchestrate-Secret');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Orchestrate-Secret, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Auth: shared secret (from pg_cron or orchestrate.js)
+  // Auth: accept EITHER the orchestrate secret (pg_cron / orchestrate.js)
+  // OR a user Bearer token (client-side polling).
   const secret = req.headers['x-orchestrate-secret'];
-  if (!ORCHESTRATE_SECRET || secret !== ORCHESTRATE_SECRET) {
+  const authHeader = req.headers['authorization'];
+  let authUserId = null;
+
+  if (ORCHESTRATE_SECRET && secret === ORCHESTRATE_SECRET) {
+    // Server secret — trusted, no user-level check needed
+  } else if (authHeader?.startsWith('Bearer ') && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    // User token — validate and extract user ID for session ownership check
+    const token = authHeader.slice(7);
+    const supabaseForAuth = getSupabaseAdmin();
+    if (supabaseForAuth && token) {
+      const { data: { user }, error: authError } = await supabaseForAuth.auth.getUser(token);
+      if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+      authUserId = user.id;
+    } else {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  } else {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -229,6 +248,11 @@ export default async function handler(req, res) {
       .single();
 
     if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    // If authenticated via user token, verify session ownership
+    if (authUserId && session.user_id && session.user_id !== authUserId) {
+      return res.status(403).json({ error: 'Session does not belong to this user' });
+    }
 
     // Handle synthesis mode
     if (mode === 'synthesize' || session.status === 'synthesizing') {
