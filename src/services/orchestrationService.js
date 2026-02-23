@@ -647,14 +647,22 @@ export class OrchestrationService {
     }
 
     if (this._serverSide && isSupabaseConfigured()) {
-      // Server-side mode: enable pg_cron job, subscribe to Realtime for live updates
-      supabase.rpc('enable_orchestration').then(({ error }) => {
-        if (error) console.warn('Failed to enable orchestration cron:', error.message);
-      });
-      useAgentStore.getState().subscribeToSession(this.sessionId);
-      useMissionReportStore.getState().subscribeToSession(this.sessionId);
-    } else {
-      // Client-side mode: run executeAgent locally (existing behavior)
+      // Try to enable pg_cron job for server-side orchestration
+      const { error } = await supabase.rpc('enable_orchestration');
+      if (error) {
+        // pg_cron not available (migration 005 not applied, or extension not enabled).
+        // Fall back to client-side execution which is the proven, working path.
+        console.warn('Server-side orchestration unavailable, using client-side:', error.message);
+        this._serverSide = false;
+      } else {
+        // pg_cron enabled — subscribe to Realtime for live DB updates
+        useAgentStore.getState().subscribeToSession(this.sessionId);
+        useMissionReportStore.getState().subscribeToSession(this.sessionId);
+      }
+    }
+
+    if (!this._serverSide) {
+      // Client-side mode: run executeAgent locally
       const rootAgent = this.store.agents.find((a) => !a.parent_id);
       if (rootAgent) {
         executeAgent(rootAgent.id, this.store, this);
