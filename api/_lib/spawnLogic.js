@@ -2,6 +2,30 @@
 // Shared between orchestrationService.js (client) and iterate.js (server)
 
 /**
+ * Valid agent roles — reject anything not in this list.
+ */
+export const VALID_ROLES = ['coordinator', 'researcher', 'executor', 'validator', 'synthesizer'];
+
+/**
+ * Sanitize an LLM-generated spawn config to prevent injection/abuse.
+ * Strips HTML tags, enforces length limits, and validates role.
+ */
+export function sanitizeSpawnConfig(config) {
+  const stripHtml = (str) => String(str || '').replace(/<[^>]*>/g, '');
+
+  const role = VALID_ROLES.includes(config.role) ? config.role : 'executor';
+  const name = stripHtml(config.name || 'Agent').slice(0, 100);
+  const objective = stripHtml(config.objective || '').slice(0, 500);
+
+  return {
+    ...config,
+    role,
+    name,
+    objective,
+  };
+}
+
+/**
  * Default mission budget constants.
  */
 export const DEFAULT_BUDGET = {
@@ -70,13 +94,14 @@ export function canSpawn(agents, parentAgentId, budget) {
  * @returns {object} Agent record ready for DB insert
  */
 export function createAgentFromConfig(config, sessionId, parentId = null, depth = 0) {
+  const safe = sanitizeSpawnConfig(config);
   return {
     id: crypto.randomUUID(),
     session_id: sessionId,
     parent_id: parentId,
-    name: config.name,
-    role: config.role,
-    objective: config.objective,
+    name: safe.name,
+    role: safe.role,
+    objective: safe.objective,
     status: 'spawning',
     priority: config.priority || 'normal',
     progress: 0,

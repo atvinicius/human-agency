@@ -7,6 +7,7 @@ import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js
 import { checkCredits, deductCredits } from './_middleware/credits.js';
 import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
 import { calculateCost } from './_config/pricing.js';
+import { sanitizeSpawnConfig } from './_lib/spawnLogic.js';
 
 export const config = {
   runtime: 'edge',
@@ -96,13 +97,14 @@ async function persistAgentUpdate(agentId, updates, sessionId) {
 async function createChildAgent(parentAgent, childConfig, sessionId) {
   if (!supabaseAdmin) return null;
 
+  const safe = sanitizeSpawnConfig(childConfig);
   const childAgent = {
     id: crypto.randomUUID(),
     session_id: sessionId,
     parent_id: parentAgent.id,
-    name: childConfig.name,
-    role: childConfig.role,
-    objective: childConfig.objective,
+    name: safe.name,
+    role: safe.role,
+    objective: safe.objective,
     status: 'spawning',
     priority: 'normal',
     progress: 0,
@@ -246,7 +248,7 @@ Respond with a JSON object containing:
     if (!response.ok) {
       const error = await response.text();
       console.error('OpenRouter error:', error);
-      return new Response(JSON.stringify({ error: 'AI request failed', details: error }), {
+      return new Response(JSON.stringify({ error: 'AI request failed' }), {
         status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -331,7 +333,7 @@ Respond with a JSON object containing:
 
   } catch (error) {
     console.error('Agent handler error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

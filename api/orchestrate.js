@@ -2,6 +2,7 @@
 // Finds active sessions and delegates to iterate.js logic.
 
 import { createClient } from '@supabase/supabase-js';
+import { setNodeCorsHeaders } from './_config/cors.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -20,9 +21,7 @@ function getSupabaseAdmin() {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Orchestrate-Secret');
+  setNodeCorsHeaders(res, req);
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -53,13 +52,22 @@ export default async function handler(req, res) {
 
     const results = [];
 
-    // Derive base URL from the incoming request's host (not VERCEL_URL, which
-    // points to the deployment preview domain and has Deployment Protection).
-    const protocol = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers['host'];
-    const baseUrl = host
-      ? `${protocol}://${host}`
-      : process.env.ORCHESTRATE_BASE_URL || 'http://localhost:3000';
+    // Safe base URL priority: env var > VERCEL_URL > validated Host header > localhost
+    // Never trust Host header alone — it can be spoofed for SSRF.
+    let baseUrl;
+    if (process.env.ORCHESTRATE_BASE_URL) {
+      baseUrl = process.env.ORCHESTRATE_BASE_URL;
+    } else if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else {
+      const host = req.headers['host'];
+      if (host && /^[\w.-]+(:\d+)?$/.test(host)) {
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        baseUrl = `${protocol}://${host}`;
+      } else {
+        baseUrl = 'http://localhost:3000';
+      }
+    }
 
     for (const session of sessions) {
       try {
@@ -87,7 +95,7 @@ export default async function handler(req, res) {
         results.push({ sessionId: session.id, ...result });
       } catch (err) {
         console.error(`Failed to iterate session ${session.id}:`, err);
-        results.push({ sessionId: session.id, error: err.message });
+        results.push({ sessionId: session.id, error: 'Iteration failed' });
       }
     }
 
@@ -95,6 +103,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Orchestrate error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

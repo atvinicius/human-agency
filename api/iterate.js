@@ -8,9 +8,10 @@ import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { buildSystemPrompt } from './_config/prompts.js';
 import { parseAgentResponse } from './_lib/parseResponse.js';
-import { canSpawn, createAgentFromConfig, DEFAULT_BUDGET } from './_lib/spawnLogic.js';
+import { canSpawn, createAgentFromConfig, sanitizeSpawnConfig, DEFAULT_BUDGET } from './_lib/spawnLogic.js';
 import { loadMessages, saveMessages, getSiblingFindings, getChildCompletions, checkMissionComplete } from './_lib/agentQueries.js';
 import { calculateCost, SEARCH_PRICING, PLATFORM_MARKUP } from './_config/pricing.js';
+import { setNodeCorsHeaders } from './_config/cors.js';
 import { webSearch } from './search.js';
 
 export const config = {
@@ -192,10 +193,8 @@ async function runSynthesis(supabase, openrouter, session) {
 }
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Orchestrate-Secret, Authorization');
+  // CORS + security headers
+  setNodeCorsHeaders(res, req);
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -250,8 +249,14 @@ export default async function handler(req, res) {
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
     // If authenticated via user token, verify session ownership
-    if (authUserId && session.user_id && session.user_id !== authUserId) {
-      return res.status(403).json({ error: 'Session does not belong to this user' });
+    if (authUserId) {
+      if (!session.user_id) {
+        // Reject sessions with NULL user_id when using user token (prevents orphan access)
+        return res.status(403).json({ error: 'Session does not belong to this user' });
+      }
+      if (session.user_id !== authUserId) {
+        return res.status(403).json({ error: 'Session does not belong to this user' });
+      }
     }
 
     // Handle synthesis mode
@@ -587,7 +592,8 @@ export default async function handler(req, res) {
       const agentsToSpawn = result.spawn_agents.slice(0, spawnCheck.remaining);
       const spawned = [];
 
-      for (const spawnConfig of agentsToSpawn) {
+      for (const rawConfig of agentsToSpawn) {
+        const spawnConfig = sanitizeSpawnConfig(rawConfig);
         const childAgent = createAgentFromConfig(
           spawnConfig, sessionId, agent.id, (agent.depth || 0) + 1
         );
@@ -698,6 +704,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Iterate error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

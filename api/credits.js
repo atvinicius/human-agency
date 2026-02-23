@@ -100,6 +100,14 @@ export default async function handler(req) {
     const { action, code } = await req.json();
 
     if (action === 'redeem' && code) {
+      // Validate promo code format before passing to RPC
+      if (typeof code !== 'string' || !/^[a-zA-Z0-9-]{1,50}$/.test(code)) {
+        return new Response(JSON.stringify({ success: false, error: 'Invalid promo code format' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { data, error } = await supabaseAdmin.rpc('redeem_promo_code', {
         p_user_id: authUser.id,
         p_code: code,

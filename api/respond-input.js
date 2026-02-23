@@ -2,6 +2,7 @@
 // Allows the client to respond to an agent's needs_input request.
 
 import { createClient } from '@supabase/supabase-js';
+import { getCorsHeaders } from './_config/cors.js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
 
 export const config = {
@@ -12,11 +13,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 export default async function handler(req) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -66,10 +63,12 @@ export default async function handler(req) {
     }
 
     // Update agent: clear pending_input, set status to working, store human response
+    // IDOR fix: scope agent lookup to the session to prevent cross-session access
     const { data: agent } = await supabase
       .from('agents')
       .select('context')
       .eq('id', agentId)
+      .eq('session_id', sessionId)
       .single();
 
     if (!agent) {
@@ -86,7 +85,7 @@ export default async function handler(req) {
         ...(agent.context || {}),
         humanResponse: response,
       },
-    }).eq('id', agentId);
+    }).eq('id', agentId).eq('session_id', sessionId);
 
     // Add the human response as a message so iterate.js picks it up
     await supabase.from('agent_messages').insert({
@@ -110,7 +109,7 @@ export default async function handler(req) {
 
   } catch (error) {
     console.error('Respond-input error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

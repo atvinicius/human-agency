@@ -5,5 +5,15 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/" }
-  ]
+  ],
+  "functions": {
+    "api/iterate.js": { "maxDuration": 60 },
+    "api/orchestrate.js": { "maxDuration": 60 },
+    "api/agent.js": { "maxDuration": 30 },
+    "api/agent-stream.js": { "maxDuration": 30 },
+    "api/plan-mission.js": { "maxDuration": 30 },
+    "api/search.js": { "maxDuration": 15 },
+    "api/credits.js": { "maxDuration": 10 },
+    "api/respond-input.js": { "maxDuration": 10 }
+  }
 }

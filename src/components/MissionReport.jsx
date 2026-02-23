@@ -31,6 +31,16 @@ const statusLabels = {
 
 const roleOrder = ['coordinator', 'researcher', 'executor', 'validator', 'synthesizer'];
 
+// Escape HTML special characters to prevent XSS in HTML export
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Convert structured or string synthesis to plain text
 function synthesisAsText(synthesis) {
   if (!synthesis) return '';
@@ -74,19 +84,24 @@ function buildExportJson(sections, searchRecords, synthesis, sourceMap) {
   };
 }
 
+// Escape then convert newlines to <br> for HTML export
+function escapeAndBr(str) {
+  return escapeHtml(str).replace(/\n/g, '<br>');
+}
+
 // Build self-contained HTML export
 function buildExportHtml(sections, synthesis, sourceMap) {
   const sourcesHtml = Object.values(sourceMap)
-    .map((s) => `<li><a href="${s.url}">${s.url}</a> (cited by: ${s.citedBy.map((c) => c.agentName).join(', ')})</li>`)
+    .map((s) => `<li><a href="${escapeHtml(s.url)}">${escapeHtml(s.url)}</a> (cited by: ${s.citedBy.map((c) => escapeHtml(c.agentName)).join(', ')})</li>`)
     .join('\n');
 
   const findingsHtml = sections
     .filter((s) => s.type !== 'artifact')
     .map((s) => {
-      let html = `<div class="finding"><h3>${s.agentName} <span class="badge">${s.role}</span></h3>`;
-      html += `<div class="content">${s.content.replace(/\n/g, '<br>')}</div>`;
+      let html = `<div class="finding"><h3>${escapeHtml(s.agentName)} <span class="badge">${escapeHtml(s.role)}</span></h3>`;
+      html += `<div class="content">${escapeAndBr(s.content)}</div>`;
       if (s.thinking && s.thinking !== 'Processing...') {
-        html += `<details><summary>Agent Reasoning</summary><p class="thinking">${s.thinking}</p></details>`;
+        html += `<details><summary>Agent Reasoning</summary><p class="thinking">${escapeAndBr(s.thinking)}</p></details>`;
       }
       html += '</div>';
       return html;
@@ -96,23 +111,24 @@ function buildExportHtml(sections, synthesis, sourceMap) {
   // Build synthesis HTML — handle structured or string
   let synthesisHtml = '';
   if (synthesis && typeof synthesis === 'object' && synthesis.executive_summary) {
-    synthesisHtml += `<h2>Executive Summary</h2><div class="content">${synthesis.executive_summary.replace(/\n/g, '<br>')}</div>`;
+    synthesisHtml += `<h2>Executive Summary</h2><div class="content">${escapeAndBr(synthesis.executive_summary)}</div>`;
     if (synthesis.key_findings?.length) {
       synthesisHtml += '<h2>Key Findings</h2>';
       for (const kf of synthesis.key_findings) {
-        const conf = kf.confidence ? ` <span class="conf-${kf.confidence}">[${kf.confidence}]</span>` : '';
-        const srcs = kf.sources?.length ? `<div class="kf-sources">${kf.sources.map((s) => `<a href="${s}">${s}</a>`).join(' ')}</div>` : '';
-        synthesisHtml += `<div class="finding"><p>${kf.finding}${conf}</p>${srcs}</div>`;
+        const confValue = ['high', 'medium', 'low'].includes(kf.confidence) ? kf.confidence : '';
+        const conf = confValue ? ` <span class="conf-${confValue}">[${confValue}]</span>` : '';
+        const srcs = kf.sources?.length ? `<div class="kf-sources">${kf.sources.map((s) => `<a href="${escapeHtml(s)}">${escapeHtml(s)}</a>`).join(' ')}</div>` : '';
+        synthesisHtml += `<div class="finding"><p>${escapeHtml(kf.finding)}${conf}</p>${srcs}</div>`;
       }
     }
     if (synthesis.detailed_analysis) {
-      synthesisHtml += `<h2>Detailed Analysis</h2><div class="content">${synthesis.detailed_analysis.replace(/\n/g, '<br>')}</div>`;
+      synthesisHtml += `<h2>Detailed Analysis</h2><div class="content">${escapeAndBr(synthesis.detailed_analysis)}</div>`;
     }
     if (synthesis.methodology) {
-      synthesisHtml += `<h2>Methodology</h2><div class="content">${synthesis.methodology.replace(/\n/g, '<br>')}</div>`;
+      synthesisHtml += `<h2>Methodology</h2><div class="content">${escapeAndBr(synthesis.methodology)}</div>`;
     }
   } else if (synthesis) {
-    synthesisHtml = `<h2>Synthesis</h2><div class="content">${String(synthesis).replace(/\n/g, '<br>')}</div>`;
+    synthesisHtml = `<h2>Synthesis</h2><div class="content">${escapeAndBr(String(synthesis))}</div>`;
   }
 
   return `<!DOCTYPE html>
