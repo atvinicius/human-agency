@@ -51,9 +51,39 @@ export default async function handler(req) {
       .single();
 
     if (error || !data) {
-      // No credit row — DB trigger should have created one on signup.
-      // Return zero balance instead of auto-granting (single granting path = DB trigger).
-      return new Response(JSON.stringify({ balance: 0, lifetime_earned: 0, lifetime_spent: 0 }), {
+      // No credit row — DB trigger should have created one on signup but may have
+      // failed or not been applied. Auto-grant beta credits as a fallback.
+      const BETA_CREDITS = 10.00;
+      const { data: grantedRow, error: grantError } = await supabaseAdmin
+        .from('user_credits')
+        .upsert(
+          { user_id: authUser.id, balance: BETA_CREDITS, lifetime_earned: BETA_CREDITS },
+          { onConflict: 'user_id', ignoreDuplicates: true }
+        )
+        .select('balance, lifetime_earned, lifetime_spent')
+        .single();
+
+      if (grantError || !grantedRow) {
+        console.error('[credits] Failed to auto-grant beta credits:', grantError?.message);
+        return new Response(JSON.stringify({ balance: 0, lifetime_earned: 0, lifetime_spent: 0 }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Log the grant for audit trail
+      await supabaseAdmin.from('credit_transactions').insert({
+        user_id: authUser.id,
+        amount: BETA_CREDITS,
+        type: 'grant',
+        source: 'beta-welcome-fallback',
+        description: 'Beta tester welcome credits (auto-granted)',
+        balance_after: grantedRow.balance,
+      }).then(({ error: txError }) => {
+        if (txError) console.error('[credits] Failed to log beta grant transaction:', txError.message);
+      });
+
+      return new Response(JSON.stringify(grantedRow), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

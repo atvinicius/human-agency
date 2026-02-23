@@ -185,6 +185,16 @@ export default function Demo() {
   }, [currentPreset, isPaused]);
 
   const handleSelectPreset = async (preset) => {
+    // Credit check before launching — prevents presets from bypassing billing
+    if (isSupabaseConfigured() && authUser) {
+      // Ensure we have a fresh balance (covers first-time users who just got credits)
+      await useCreditStore.getState().fetchBalance();
+      if (!useCreditStore.getState().hasCredits()) {
+        alert('Insufficient credits to launch a mission. Please add credits to continue.');
+        return;
+      }
+    }
+
     setShowPresetSelector(false);
     setCurrentPreset(preset);
     reset();
