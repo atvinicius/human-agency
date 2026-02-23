@@ -52,13 +52,12 @@ export default async function handler(req, res) {
 
     const results = [];
 
-    // Safe base URL priority: env var > VERCEL_URL > validated Host header > localhost
-    // Never trust Host header alone — it can be spoofed for SSRF.
+    // Safe base URL priority: env var > validated Host header > localhost
+    // VERCEL_URL points to the deployment preview domain (has Deployment Protection)
+    // so we skip it — the Host header from pg_cron is the production URL.
     let baseUrl;
     if (process.env.ORCHESTRATE_BASE_URL) {
       baseUrl = process.env.ORCHESTRATE_BASE_URL;
-    } else if (process.env.VERCEL_URL) {
-      baseUrl = `https://${process.env.VERCEL_URL}`;
     } else {
       const host = req.headers['host'];
       if (host && /^[\w.-]+(:\d+)?$/.test(host)) {

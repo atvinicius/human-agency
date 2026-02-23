@@ -251,8 +251,12 @@ export default async function handler(req, res) {
     // If authenticated via user token, verify session ownership
     if (authUserId) {
       if (!session.user_id) {
-        // Reject sessions with NULL user_id when using user token (prevents orphan access)
-        return res.status(403).json({ error: 'Session does not belong to this user' });
+        // Session created during auth timing window — claim it for this user
+        await supabase.from('sessions')
+          .update({ user_id: authUserId })
+          .eq('id', sessionId)
+          .is('user_id', null);
+        session.user_id = authUserId;
       }
       if (session.user_id !== authUserId) {
         return res.status(403).json({ error: 'Session does not belong to this user' });
