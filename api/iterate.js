@@ -10,7 +10,7 @@ import { buildSystemPrompt } from './_config/prompts.js';
 import { parseAgentResponse } from './_lib/parseResponse.js';
 import { canSpawn, createAgentFromConfig, DEFAULT_BUDGET } from './_lib/spawnLogic.js';
 import { loadMessages, saveMessages, getSiblingFindings, getChildCompletions, checkMissionComplete } from './_lib/agentQueries.js';
-import { calculateCost } from './_config/pricing.js';
+import { calculateCost, SEARCH_PRICING, PLATFORM_MARKUP } from './_config/pricing.js';
 import { webSearch } from './search.js';
 
 export const config = {
@@ -38,7 +38,7 @@ const COMPRESS_EVERY = 3;
  * Compress older messages into a summary via LLM, keeping recent context.
  */
 async function compressContext(messages, agentObjective, openrouter) {
-  if (messages.length <= COMPRESS_WINDOW + 1) return messages;
+  if (messages.length <= COMPRESS_WINDOW + 1) return { messages, usage: null };
 
   const oldMessages = messages.slice(0, -COMPRESS_WINDOW);
   const recentMessages = messages.slice(-COMPRESS_WINDOW);
@@ -48,7 +48,7 @@ async function compressContext(messages, agentObjective, openrouter) {
     .join('\n');
 
   try {
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: openrouter('moonshotai/kimi-k2'),
       system: 'You are a concise summarizer. Summarize the conversation in 2-3 sentences.',
       messages: [
@@ -61,16 +61,22 @@ async function compressContext(messages, agentObjective, openrouter) {
       temperature: 0.3,
     });
 
-    return [
-      { role: 'user', content: `Context summary of your work so far:\n${text}\n\nContinue from where you left off.` },
-      ...recentMessages,
-    ];
+    return {
+      messages: [
+        { role: 'user', content: `Context summary of your work so far:\n${text}\n\nContinue from where you left off.` },
+        ...recentMessages,
+      ],
+      usage,
+    };
   } catch {
     // Truncation fallback
-    return [
-      { role: 'user', content: `You have been working on: "${agentObjective}". Continue your work.` },
-      ...recentMessages,
-    ];
+    return {
+      messages: [
+        { role: 'user', content: `You have been working on: "${agentObjective}". Continue your work.` },
+        ...recentMessages,
+      ],
+      usage: null,
+    };
   }
 }
 
@@ -143,7 +149,7 @@ async function runSynthesis(supabase, openrouter, session) {
     if (session.user_id && usage) {
       const cost = calculateCost('moonshotai/kimi-k2', usage.promptTokens || 0, usage.completionTokens || 0);
       if (cost > 0) {
-        await supabase.rpc('deduct_credits', {
+        const { data: deductResult, error: deductError } = await supabase.rpc('deduct_credits', {
           p_user_id: session.user_id,
           p_amount: cost,
           p_model_id: 'moonshotai/kimi-k2',
@@ -152,6 +158,19 @@ async function runSynthesis(supabase, openrouter, session) {
           p_session_id: session.id,
           p_description: 'Synthesis',
         });
+        if (deductError) {
+          console.error('[billing] Synthesis deduction FAILED — needs reconciliation:', {
+            error: deductError.message,
+            userId: session.user_id,
+            cost,
+            sessionId: session.id,
+            timestamp: new Date().toISOString(),
+          });
+        } else if (deductResult && !deductResult.success) {
+          console.error('[billing] Synthesis deduction rejected:', deductResult.error, {
+            userId: session.user_id, cost, sessionId: session.id,
+          });
+        }
       }
     }
   } catch (err) {
@@ -259,10 +278,36 @@ export default async function handler(req, res) {
 
     // === Context compression ===
     if (iteration > 1 && iteration % COMPRESS_EVERY === 0 && messages.length > COMPRESS_WINDOW + 1) {
-      messages = await compressContext(messages, agent.objective, openrouter);
+      const compressed = await compressContext(messages, agent.objective, openrouter);
+      messages = compressed.messages;
       // Save compressed messages (replace all)
       await supabase.from('agent_messages').delete().eq('agent_id', agent.id);
       await saveMessages(supabase, agent.id, messages);
+
+      // Deduct compression LLM costs
+      if (session.user_id && compressed.usage) {
+        const compressCost = calculateCost('moonshotai/kimi-k2', compressed.usage.promptTokens || 0, compressed.usage.completionTokens || 0);
+        if (compressCost > 0) {
+          const { error: compressDeductError } = await supabase.rpc('deduct_credits', {
+            p_user_id: session.user_id,
+            p_amount: compressCost,
+            p_model_id: 'moonshotai/kimi-k2',
+            p_prompt_tokens: compressed.usage.promptTokens || 0,
+            p_completion_tokens: compressed.usage.completionTokens || 0,
+            p_session_id: sessionId,
+            p_description: `Context compression: ${agent.name}`,
+          });
+          if (compressDeductError) {
+            console.error('[billing] Compression deduction FAILED:', {
+              error: compressDeductError.message,
+              userId: session.user_id,
+              agentName: agent.name,
+              cost: compressCost,
+              sessionId,
+            });
+          }
+        }
+      }
     }
 
     // === Child completion injection ===
@@ -381,11 +426,41 @@ export default async function handler(req, res) {
     const assistantMsg = { role: 'assistant', content: text };
     newMessages.push(assistantMsg);
 
-    // === Update search count ===
+    // === Update search count and deduct search credits ===
     if (searchCount > 0) {
       await supabase.from('sessions')
         .update({ search_count: sessionSearchCount + searchCount })
         .eq('id', sessionId);
+
+      // Deduct search costs
+      if (session.user_id) {
+        const searchCost = Math.round(searchCount * SEARCH_PRICING.cost_per_search * PLATFORM_MARKUP * 10000) / 10000;
+        if (searchCost > 0) {
+          const { data: searchDeductResult, error: searchDeductError } = await supabase.rpc('deduct_credits', {
+            p_user_id: session.user_id,
+            p_amount: searchCost,
+            p_model_id: null,
+            p_prompt_tokens: null,
+            p_completion_tokens: null,
+            p_session_id: sessionId,
+            p_description: `${searchCount} web search(es)`,
+          });
+          if (searchDeductError) {
+            console.error('[billing] Search deduction FAILED — needs reconciliation:', {
+              error: searchDeductError.message,
+              userId: session.user_id,
+              searchCount,
+              searchCost,
+              sessionId,
+              timestamp: new Date().toISOString(),
+            });
+          } else if (searchDeductResult && !searchDeductResult.success) {
+            console.error('[billing] Search deduction rejected:', searchDeductResult.error, {
+              userId: session.user_id, searchCount, sessionId,
+            });
+          }
+        }
+      }
     }
 
     // === Deduct credits ===
@@ -393,7 +468,7 @@ export default async function handler(req, res) {
       const modelId = agent.model || 'moonshotai/kimi-k2';
       const cost = calculateCost(modelId, usage.promptTokens || 0, usage.completionTokens || 0);
       if (cost > 0) {
-        await supabase.rpc('deduct_credits', {
+        const { data: deductResult, error: deductError } = await supabase.rpc('deduct_credits', {
           p_user_id: session.user_id,
           p_amount: cost,
           p_model_id: modelId,
@@ -402,6 +477,23 @@ export default async function handler(req, res) {
           p_session_id: sessionId,
           p_description: `Agent: ${agent.name}`,
         });
+        if (deductError) {
+          console.error('[billing] Agent deduction FAILED — needs reconciliation:', {
+            error: deductError.message,
+            userId: session.user_id,
+            agentName: agent.name,
+            cost,
+            modelId,
+            promptTokens: usage.promptTokens || 0,
+            completionTokens: usage.completionTokens || 0,
+            sessionId,
+            timestamp: new Date().toISOString(),
+          });
+        } else if (deductResult && !deductResult.success) {
+          console.error('[billing] Agent deduction rejected:', deductResult.error, {
+            userId: session.user_id, agentName: agent.name, cost, sessionId,
+          });
+        }
       }
     }
 
