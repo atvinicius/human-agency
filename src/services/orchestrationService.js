@@ -733,11 +733,16 @@ export class OrchestrationService {
   _startIteratePolling() {
     if (this._iterateInterval) return;
 
+    const FAST_INTERVAL = 1000;  // 1s when work was done
+    const IDLE_INTERVAL = 5000;  // 5s when no agent available
+
     const poll = async () => {
       if (!this.running || !this.sessionId) {
         this._stopIteratePolling();
         return;
       }
+
+      let nextDelay = IDLE_INTERVAL;
 
       try {
         const token = useAuthStore.getState().getAccessToken();
@@ -753,41 +758,48 @@ export class OrchestrationService {
         if (!response.ok) {
           const err = await response.json().catch(() => ({}));
           if (response.status === 402) {
-            // Insufficient credits — pause and stop polling
             console.warn('[iterate] Insufficient credits');
             useCreditStore.getState().fetchBalance();
             this._stopIteratePolling();
             return;
           }
           console.error('[iterate] Server error:', err.error || response.status);
-          return;
-        }
+        } else {
+          const result = await response.json();
 
-        const result = await response.json();
+          // Refresh credit balance after each iteration
+          if (result.action === 'iterated' || result.action === 'completed' || result.action === 'synthesized') {
+            useCreditStore.getState().fetchBalance();
+          }
 
-        // Refresh credit balance after each iteration
-        if (result.action === 'iterated' || result.action === 'completed' || result.action === 'synthesized') {
-          useCreditStore.getState().fetchBalance();
-        }
+          // Mission complete — stop polling
+          if (result.action === 'synthesized') {
+            this._stopIteratePolling();
+            return;
+          }
 
-        // Mission complete — stop polling
-        if (result.action === 'synthesized') {
-          this._stopIteratePolling();
+          // Adaptive: re-poll quickly when work was done, slow down when idle
+          if (result.action === 'iterated' || result.action === 'completed') {
+            nextDelay = FAST_INTERVAL;
+          }
         }
       } catch (err) {
         console.error('[iterate] Poll failed:', err.message);
+      }
+
+      // Schedule next poll (adaptive interval)
+      if (this.running && this.sessionId) {
+        this._iterateInterval = setTimeout(poll, nextDelay);
       }
     };
 
     // Kick off the first iteration immediately
     poll();
-    // Then poll every 5 seconds
-    this._iterateInterval = setInterval(poll, 5000);
   }
 
   _stopIteratePolling() {
     if (this._iterateInterval) {
-      clearInterval(this._iterateInterval);
+      clearTimeout(this._iterateInterval);
       this._iterateInterval = null;
     }
   }

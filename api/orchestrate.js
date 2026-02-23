@@ -53,9 +53,12 @@ export default async function handler(req, res) {
 
     const results = [];
 
-    // Determine the base URL for calling iterate
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
+    // Derive base URL from the incoming request's host (not VERCEL_URL, which
+    // points to the deployment preview domain and has Deployment Protection).
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers['host'];
+    const baseUrl = host
+      ? `${protocol}://${host}`
       : process.env.ORCHESTRATE_BASE_URL || 'http://localhost:3000';
 
     for (const session of sessions) {
@@ -71,6 +74,14 @@ export default async function handler(req, res) {
             mode: session.status === 'synthesizing' ? 'synthesize' : 'iterate',
           }),
         });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          // Got HTML instead of JSON — likely Deployment Protection or redirect
+          console.error(`iterate returned non-JSON (${response.status}) for session ${session.id}`);
+          results.push({ sessionId: session.id, error: `Non-JSON response: ${response.status}` });
+          continue;
+        }
 
         const result = await response.json();
         results.push({ sessionId: session.id, ...result });
