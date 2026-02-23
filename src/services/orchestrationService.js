@@ -127,7 +127,8 @@ function createAgentFromConfig(config, sessionId, parentId = null, depth = 0) {
     current_activity: 'Initializing...',
     context: config.context || {},
     model: config.model || 'moonshotai/kimi-k2',
-    _depth: depth,
+    depth,
+    iteration: 0,
   };
 }
 
@@ -140,13 +141,19 @@ async function spawnAgentTree(config, sessionId, parentId = null, store, depth =
 
   // Persist to Supabase if configured
   if (isSupabaseConfigured()) {
-    await supabase.from('agents').insert(agent);
-    await supabase.from('events').insert({
+    const { error: agentError } = await supabase.from('agents').insert(agent);
+    if (agentError) {
+      console.error(`[spawn] Failed to insert agent "${agent.name}" into DB:`, agentError.message);
+    }
+    const { error: eventError } = await supabase.from('events').insert({
       session_id: sessionId,
       agent_id: agent.id,
       type: 'spawn',
       message: `${agent.name} spawned as ${agent.role}`,
     });
+    if (eventError) {
+      console.error(`[spawn] Failed to insert spawn event for "${agent.name}":`, eventError.message);
+    }
   }
 
   // Spawn children after a delay for visual effect
@@ -401,7 +408,7 @@ async function executeAgent(agentId, store, orchestrator) {
               spawnConfig,
               currentAgent.session_id,
               agentId,
-              (currentAgent._depth || 0) + 1
+              (currentAgent.depth || currentAgent._depth || 0) + 1
             );
 
             // Inject parent context into child
@@ -602,18 +609,21 @@ export class OrchestrationService {
       if (!userId) {
         console.warn('Session created without user_id — auth may not have resolved yet. The subscribe fallback will patch it.');
       }
-      try {
-        await supabase.from('sessions').insert({
-          id: this.sessionId,
-          name: preset.name,
-          preset_id: preset.id,
-          objective: preset.initial_objective,
-          status: 'active',
-          metadata: { preset_config: preset },
-          user_id: userId || null,
-        });
-      } catch (err) {
-        console.error('Failed to create session in Supabase:', err);
+      // preset_id is a FK to presets(id) — only pass valid UUIDs, null otherwise
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const presetId = preset.id && UUID_RE.test(preset.id) ? preset.id : null;
+
+      const { error: sessionError } = await supabase.from('sessions').insert({
+        id: this.sessionId,
+        name: preset.name,
+        preset_id: presetId,
+        objective: preset.initial_objective,
+        status: 'active',
+        metadata: { preset_config: preset },
+        user_id: userId || null,
+      });
+      if (sessionError) {
+        console.error('Failed to create session in Supabase:', sessionError.message);
       }
 
       // If userId wasn't available at creation, set it once auth resolves
