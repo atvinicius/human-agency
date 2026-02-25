@@ -1033,13 +1033,18 @@ Rules:
       this.findingsRegistry.reset();
     }
 
-    // Mark session as completed
+    // Mark session as completed and disable orchestration cron
     if (isSupabaseConfigured() && this.sessionId) {
       try {
         await supabase.from('sessions').update({
           status: 'completed',
           completed_at: new Date().toISOString(),
         }).eq('id', this.sessionId);
+
+        // Disable pg_cron job — no need to keep polling if user explicitly stopped
+        supabase.rpc('disable_orchestration').catch((err) => {
+          console.warn('Failed to disable orchestration cron:', err.message);
+        });
       } catch (err) {
         console.error('Failed to update session status in Supabase:', err);
       }

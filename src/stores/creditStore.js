@@ -7,6 +7,7 @@ export const useCreditStore = create((set, get) => ({
   error: null,
   _refreshInterval: null,
   _authUnsub: null,
+  _visibilityHandler: null,
   _fetchInFlight: false,
   _lastFetchTime: 0,
 
@@ -74,8 +75,10 @@ export const useCreditStore = create((set, get) => ({
     const interval = get()._refreshInterval;
     if (interval) return; // Already running
 
+    const REFRESH_INTERVAL = 120_000; // 2min
+
     get().fetchBalance();
-    const id = setInterval(() => get().fetchBalance(), 120_000); // 2min (was 30s — 4x reduction)
+    const id = setInterval(() => get().fetchBalance(), REFRESH_INTERVAL);
     set({ _refreshInterval: id });
 
     // When auth session appears (e.g. after page reload), fetch immediately
@@ -85,6 +88,26 @@ export const useCreditStore = create((set, get) => ({
       }
     });
     set({ _authUnsub: unsub });
+
+    // Pause polling when tab is hidden, resume when visible
+    const visHandler = () => {
+      if (document.hidden) {
+        const currentId = get()._refreshInterval;
+        if (currentId) {
+          clearInterval(currentId);
+          set({ _refreshInterval: null });
+        }
+      } else {
+        // Resume only if not already running
+        if (!get()._refreshInterval) {
+          get().fetchBalance();
+          const newId = setInterval(() => get().fetchBalance(), REFRESH_INTERVAL);
+          set({ _refreshInterval: newId });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', visHandler);
+    set({ _visibilityHandler: visHandler });
   },
 
   stopAutoRefresh: () => {
@@ -97,6 +120,11 @@ export const useCreditStore = create((set, get) => ({
     if (unsub) {
       unsub();
       set({ _authUnsub: null });
+    }
+    const visHandler = get()._visibilityHandler;
+    if (visHandler) {
+      document.removeEventListener('visibilitychange', visHandler);
+      set({ _visibilityHandler: null });
     }
   },
 }));

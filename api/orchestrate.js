@@ -41,13 +41,46 @@ export default async function handler(req, res) {
     // Find active and synthesizing sessions
     const { data: sessions, error } = await supabase
       .from('sessions')
-      .select('id, status')
+      .select('id, status, started_at, created_at')
       .in('status', ['active', 'synthesizing']);
 
     if (error || !sessions || sessions.length === 0) {
       // No active sessions — disable the cron job to save invocations
       await supabase.rpc('disable_orchestration');
       return res.status(200).json({ action: 'idle', sessions: 0, cron: 'disabled' });
+    }
+
+    // === Stale session cleanup: force-complete sessions older than 30 minutes ===
+    const MISSION_DURATION_CAP_MS = 30 * 60 * 1000;
+    const staleSessions = [];
+
+    for (const session of sessions) {
+      if (session.status !== 'active') continue;
+      const startedAt = new Date(session.started_at || session.created_at).getTime();
+      const elapsed = Date.now() - startedAt;
+
+      if (elapsed > MISSION_DURATION_CAP_MS) {
+        console.log(`[orchestrate] Stale session ${session.id} (${Math.round(elapsed / 60000)}min) — force-completing agents`);
+        staleSessions.push(session.id);
+
+        // Force-complete all working/spawning agents
+        await supabase.from('agents')
+          .update({
+            status: 'completed',
+            completion_output: 'Mission time limit reached (30 minutes)',
+            current_activity: 'Time limit reached',
+            progress: 100,
+          })
+          .eq('session_id', session.id)
+          .in('status', ['working', 'spawning']);
+
+        // Transition to synthesizing so iterate.js handles the synthesis
+        await supabase.from('sessions')
+          .update({ status: 'synthesizing' })
+          .eq('id', session.id);
+
+        session.status = 'synthesizing';
+      }
     }
 
     const results = [];

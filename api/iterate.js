@@ -263,6 +263,28 @@ export default async function handler(req, res) {
       }
     }
 
+    // === Mission duration cap: 30 minutes ===
+    const MISSION_DURATION_CAP_MS = 30 * 60 * 1000;
+    const elapsed = Date.now() - new Date(session.started_at || session.created_at).getTime();
+    if (elapsed > MISSION_DURATION_CAP_MS && session.status === 'active') {
+      console.log(`[iterate] Mission ${sessionId} exceeded 30min cap (${Math.round(elapsed / 60000)}min) — force-completing`);
+
+      // Force-complete all working/spawning agents
+      await supabase.from('agents')
+        .update({
+          status: 'completed',
+          completion_output: 'Mission time limit reached (30 minutes)',
+          current_activity: 'Time limit reached',
+          progress: 100,
+        })
+        .eq('session_id', sessionId)
+        .in('status', ['working', 'spawning']);
+
+      // Transition to synthesis
+      await supabase.from('sessions').update({ status: 'synthesizing' }).eq('id', sessionId);
+      session.status = 'synthesizing';
+    }
+
     // Handle synthesis mode
     if (mode === 'synthesize' || session.status === 'synthesizing') {
       await runSynthesis(supabase, openrouter, session);
