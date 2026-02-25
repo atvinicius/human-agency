@@ -733,14 +733,38 @@ export class OrchestrationService {
   _startIteratePolling() {
     if (this._iterateInterval) return;
 
-    const FAST_INTERVAL = 1000;  // 1s when work was done
-    const IDLE_INTERVAL = 5000;  // 5s when no agent available
+    const FAST_INTERVAL = 3000;   // 3s when work was done (was 1s — 3x reduction)
+    const IDLE_INTERVAL = 15000;  // 15s when no agent available (was 5s — 3x reduction)
+    const ERROR_BASE = 5000;      // Base delay on error
+    const ERROR_MAX = 60000;      // Max delay on consecutive errors
+    const MAX_CONSECUTIVE_ERRORS = 20;
+
+    this._consecutiveErrors = 0;
+
+    // Pause polling when tab is not visible to save edge requests
+    this._visibilityHandler = () => {
+      if (document.hidden) {
+        // Tab hidden — pause polling
+        if (this._iterateInterval) {
+          clearTimeout(this._iterateInterval);
+          this._iterateInterval = null;
+        }
+      } else if (this.running && this.sessionId && !this._iterateInterval) {
+        // Tab visible again — resume polling
+        this._consecutiveErrors = 0;
+        poll();
+      }
+    };
+    document.addEventListener('visibilitychange', this._visibilityHandler);
 
     const poll = async () => {
       if (!this.running || !this.sessionId) {
         this._stopIteratePolling();
         return;
       }
+
+      // Don't poll when tab is hidden
+      if (document.hidden) return;
 
       let nextDelay = IDLE_INTERVAL;
 
@@ -763,14 +787,18 @@ export class OrchestrationService {
             this._stopIteratePolling();
             return;
           }
-          console.error('[iterate] Server error:', err.error || response.status);
-        } else {
-          const result = await response.json();
-
-          // Refresh credit balance after each iteration
-          if (result.action === 'iterated' || result.action === 'completed' || result.action === 'synthesized') {
-            useCreditStore.getState().fetchBalance();
+          // Exponential backoff on server errors
+          this._consecutiveErrors++;
+          if (this._consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            console.error(`[iterate] ${MAX_CONSECUTIVE_ERRORS} consecutive errors — stopping polling`);
+            this._stopIteratePolling();
+            return;
           }
+          nextDelay = Math.min(ERROR_BASE * Math.pow(2, this._consecutiveErrors - 1), ERROR_MAX);
+          console.error('[iterate] Server error:', err.error || response.status, `(retry in ${nextDelay}ms)`);
+        } else {
+          this._consecutiveErrors = 0;
+          const result = await response.json();
 
           // Mission complete — stop polling
           if (result.action === 'synthesized') {
@@ -778,13 +806,26 @@ export class OrchestrationService {
             return;
           }
 
-          // Adaptive: re-poll quickly when work was done, slow down when idle
+          if (result.action === 'insufficient_credits') {
+            useCreditStore.getState().fetchBalance();
+            this._stopIteratePolling();
+            return;
+          }
+
+          // Adaptive: re-poll faster when work was done, slow down when idle
           if (result.action === 'iterated' || result.action === 'completed') {
             nextDelay = FAST_INTERVAL;
           }
         }
       } catch (err) {
-        console.error('[iterate] Poll failed:', err.message);
+        this._consecutiveErrors++;
+        if (this._consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          console.error(`[iterate] ${MAX_CONSECUTIVE_ERRORS} consecutive errors — stopping polling`);
+          this._stopIteratePolling();
+          return;
+        }
+        nextDelay = Math.min(ERROR_BASE * Math.pow(2, this._consecutiveErrors - 1), ERROR_MAX);
+        console.error('[iterate] Poll failed:', err.message, `(retry in ${nextDelay}ms)`);
       }
 
       // Schedule next poll (adaptive interval)
@@ -802,6 +843,11 @@ export class OrchestrationService {
       clearTimeout(this._iterateInterval);
       this._iterateInterval = null;
     }
+    if (this._visibilityHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
+    this._consecutiveErrors = 0;
   }
 
   _checkMissionComplete() {

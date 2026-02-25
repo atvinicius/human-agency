@@ -33,6 +33,7 @@ export class RequestQueue {
         resolve,
         reject,
         enqueuedAt: Date.now(),
+        retryCount: 0,
       };
       this._insertByPriority(item);
       this._emitMetrics();
@@ -104,9 +105,16 @@ export class RequestQueue {
     } catch (error) {
       // Handle rate limiting (HTTP 429)
       if (error.status === 429 || error.message?.includes('429')) {
-        this._handleRateLimit(error);
-        // Re-queue at front with same priority
-        this.queue.unshift(item);
+        item.retryCount = (item.retryCount || 0) + 1;
+        if (item.retryCount > 3) {
+          console.error(`[RequestQueue] Max retries (3) exceeded for agent ${item.agentId}`);
+          this.metrics.totalErrors++;
+          item.reject(error);
+        } else {
+          this._handleRateLimit(error, item.retryCount);
+          // Re-queue at front with same priority
+          this.queue.unshift(item);
+        }
       } else {
         this.metrics.totalErrors++;
         item.reject(error);
@@ -119,10 +127,10 @@ export class RequestQueue {
     }
   }
 
-  _handleRateLimit(error) {
-    // Parse Retry-After header if available, default to 5s
-    const retryAfter = 5000;
-    console.warn(`[RequestQueue] Rate limited. Pausing for ${retryAfter}ms`);
+  _handleRateLimit(error, retryCount = 1) {
+    // Exponential backoff: 5s, 10s, 20s
+    const retryAfter = 5000 * Math.pow(2, retryCount - 1);
+    console.warn(`[RequestQueue] Rate limited (attempt ${retryCount}/3). Pausing for ${retryAfter}ms`);
     this.paused = true;
     setTimeout(() => {
       this.paused = false;

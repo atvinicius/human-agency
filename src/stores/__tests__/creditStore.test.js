@@ -17,6 +17,8 @@ describe('creditStore', () => {
       loading: false,
       error: null,
       _refreshInterval: null,
+      _fetchInFlight: false,
+      _lastFetchTime: 0,
     });
     vi.restoreAllMocks();
   });

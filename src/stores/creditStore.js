@@ -7,26 +7,33 @@ export const useCreditStore = create((set, get) => ({
   error: null,
   _refreshInterval: null,
   _authUnsub: null,
+  _fetchInFlight: false,
+  _lastFetchTime: 0,
 
   fetchBalance: async () => {
+    // Deduplication: skip if a fetch is already in progress
+    if (get()._fetchInFlight) return false;
+    // Throttle: skip if fetched less than 5s ago
+    if (Date.now() - get()._lastFetchTime < 5000) return false;
+
     const token = useAuthStore.getState().getAccessToken();
     if (!token) {
       console.warn('[credits] fetchBalance skipped — no access token yet');
       return false;
     }
 
-    set({ loading: true });
+    set({ loading: true, _fetchInFlight: true });
     try {
       const res = await fetch('/api/credits', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch credits');
       const data = await res.json();
-      set({ balance: data.balance, loading: false, error: null });
+      set({ balance: data.balance, loading: false, error: null, _fetchInFlight: false, _lastFetchTime: Date.now() });
       return true;
     } catch (err) {
       console.error('[credits] fetchBalance failed:', err.message);
-      set({ loading: false, error: err.message });
+      set({ loading: false, error: err.message, _fetchInFlight: false, _lastFetchTime: Date.now() });
       return false;
     }
   },
@@ -68,7 +75,7 @@ export const useCreditStore = create((set, get) => ({
     if (interval) return; // Already running
 
     get().fetchBalance();
-    const id = setInterval(() => get().fetchBalance(), 30_000);
+    const id = setInterval(() => get().fetchBalance(), 120_000); // 2min (was 30s — 4x reduction)
     set({ _refreshInterval: id });
 
     // When auth session appears (e.g. after page reload), fetch immediately
