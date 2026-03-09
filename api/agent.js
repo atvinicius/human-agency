@@ -317,7 +317,18 @@ Respond with a JSON object containing:
       );
       if (deductResult?.success) {
         balance = deductResult.balance;
+      } else if (deductResult && !deductResult.success) {
+        console.error('[billing] Agent deduction rejected:', deductResult.error, {
+          userId: authUser.id, modelId, cost, sessionId,
+        });
       }
+    } else if (authUser && !data.usage) {
+      console.warn('[billing] OpenRouter returned no usage data — credits not deducted', {
+        userId: authUser.id,
+        modelId: agent.model || 'moonshotai/kimi-k2',
+        sessionId,
+        responseKeys: Object.keys(data || {}),
+      });
     }
 
     return new Response(JSON.stringify({

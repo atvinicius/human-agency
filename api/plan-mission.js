@@ -1,15 +1,17 @@
-// Streaming Edge Function for mission planning
+// Node.js runtime endpoint for mission planning
 // Takes a user's objective and generates an agent tree configuration
+// Uses pipeTextStreamToResponse + await usage for reliable billing
 
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { getCorsHeaders } from './_config/cors.js';
-import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
+import { setNodeCorsHeaders } from './_config/cors.js';
+import { authenticateRequest } from './_middleware/auth.js';
 import { checkCredits, deductCredits } from './_middleware/credits.js';
-import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
+import { checkRateLimit } from './_middleware/rateLimit.js';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
+  maxDuration: 120,
 };
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -62,25 +64,19 @@ Guidelines:
 - Make objectives specific (e.g., "Research competitor pricing models in the SaaS space", not "Do research")
 - Maximum tree depth of 3 levels (root coordinator → specialists → sub-specialists)`;
 
-export default async function handler(req) {
-  const corsHeaders = getCorsHeaders(req);
+export default async function handler(req, res) {
+  setNodeCorsHeaders(res, req);
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   if (!OPENROUTER_API_KEY) {
-    return new Response(JSON.stringify({ error: 'OpenRouter API key not configured' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return res.status(500).json({ error: 'OpenRouter API key not configured' });
   }
 
   // Authenticate request — require auth when running with billing enabled
@@ -88,36 +84,35 @@ export default async function handler(req) {
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   const authUser = await authenticateRequest(req);
   if (!authUser && ((SUPABASE_URL && SUPABASE_SERVICE_KEY) || OPENROUTER_API_KEY)) {
-    return unauthorizedResponse(corsHeaders);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
     // Rate limit per user (or IP for unauthenticated)
-    const rateLimitKey = authUser?.id || req.headers.get('x-forwarded-for') || 'anon';
+    const rateLimitKey = authUser?.id || req.headers['x-forwarded-for'] || 'anon';
     const rateCheck = checkRateLimit(rateLimitKey, 'agent');
     if (!rateCheck.allowed) {
-      return rateLimitResponse(rateCheck.retryAfterMs, corsHeaders);
+      const retryAfterSec = Math.ceil(rateCheck.retryAfterMs / 1000);
+      res.setHeader('Retry-After', String(retryAfterSec));
+      return res.status(429).json({
+        error: 'Too many requests',
+        retryAfter: retryAfterSec,
+      });
     }
 
-    const { objective } = await req.json();
+    const { objective } = req.body || {};
 
     if (!objective?.trim()) {
-      return new Response(JSON.stringify({ error: 'Objective is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return res.status(400).json({ error: 'Objective is required' });
     }
 
     // Credit check before making LLM call
     if (authUser) {
       const creditCheck = await checkCredits(authUser.id);
       if (creditCheck && !creditCheck.allowed) {
-        return new Response(JSON.stringify({
+        return res.status(402).json({
           error: 'Insufficient credits',
           balance: creditCheck.balance,
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
@@ -128,48 +123,49 @@ export default async function handler(req) {
       model,
       system: PLANNER_PROMPT,
       messages: [
-        {
-          role: 'user',
-          content: `Plan a mission for this objective: ${objective}`,
-        },
+        { role: 'user', content: `Plan a mission for this objective: ${objective}` },
       ],
       temperature: 0.7,
       maxTokens: 3000,
-      onFinish: async ({ usage }) => {
-        if (authUser && usage) {
-          try {
-            const result = await deductCredits(
-              authUser.id, 'moonshotai/kimi-k2',
-              usage.promptTokens || 0,
-              usage.completionTokens || 0
-            );
-            if (result && !result.success) {
-              console.error('[billing] Plan deduction rejected:', result.error, {
-                userId: authUser.id,
-                tokens: { prompt: usage.promptTokens, completion: usage.completionTokens },
-              });
-            }
-          } catch (err) {
-            console.error('[billing] Plan deduction FAILED — needs reconciliation:', {
-              error: err.message,
-              userId: authUser.id,
-              promptTokens: usage.promptTokens || 0,
-              completionTokens: usage.completionTokens || 0,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        }
-      },
+      // No onFinish — billing handled synchronously after stream
     });
 
-    return result.toTextStreamResponse({
-      headers: corsHeaders,
-    });
+    result.pipeTextStreamToResponse(res);
+
+    const usage = await result.usage;
+
+    // Note: sessionId is not available here — the session hasn't been created yet at planning time
+    if (authUser && usage) {
+      try {
+        const deductResult = await deductCredits(
+          authUser.id, 'moonshotai/kimi-k2',
+          usage.promptTokens || 0,
+          usage.completionTokens || 0
+        );
+        if (deductResult && !deductResult.success) {
+          console.error('[billing] Plan deduction rejected:', deductResult.error, {
+            userId: authUser.id,
+            tokens: { prompt: usage.promptTokens, completion: usage.completionTokens },
+          });
+        }
+      } catch (err) {
+        console.error('[billing] Plan deduction FAILED — needs reconciliation:', {
+          error: err.message, userId: authUser.id,
+          modelId: 'moonshotai/kimi-k2',
+          promptTokens: usage.promptTokens || 0,
+          completionTokens: usage.completionTokens || 0,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } else if (authUser && !usage) {
+      console.warn('[billing] No usage data from plan stream — credits not deducted', {
+        userId: authUser.id, modelId: 'moonshotai/kimi-k2',
+      });
+    }
   } catch (error) {
     console.error('Plan mission error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 }

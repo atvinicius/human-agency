@@ -27,11 +27,11 @@ function getAuthHeaders() {
 }
 
 // Call AI through Vercel API route — non-streaming fallback
-async function callAgent(agent, messages) {
+async function callAgent(agent, messages, sessionId = null) {
   const response = await fetch('/api/agent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify({ agent, messages }),
+    body: JSON.stringify({ agent, messages, sessionId }),
   });
 
   if (!response.ok) {
@@ -45,11 +45,11 @@ async function callAgent(agent, messages) {
 }
 
 // Call AI with streaming — returns parsed result, calls onDelta during stream
-async function callAgentStream(agent, messages, onDelta) {
+async function callAgentStream(agent, messages, onDelta, sessionId = null) {
   const response = await fetch('/api/agent-stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify({ agent, messages }),
+    body: JSON.stringify({ agent, messages, sessionId }),
   });
 
   if (!response.ok) {
@@ -226,7 +226,7 @@ async function executeAgent(agentId, store, orchestrator) {
       // Compress context every 3 iterations to reduce token usage
       if (shouldCompress(iterations, messages.length)) {
         messages = await compressContext(messages, currentAgent.objective, (agent, msgs) =>
-          requestQueue.enqueue(agentId, 'background', () => callAgent(agent, msgs))
+          requestQueue.enqueue(agentId, 'background', () => callAgent(agent, msgs, orchestrator.sessionId))
         );
       }
 
@@ -304,7 +304,7 @@ async function executeAgent(agentId, store, orchestrator) {
               },
             });
           }
-        })
+        }, orchestrator.sessionId)
       );
 
       // Refresh credit balance after each agent call
@@ -962,7 +962,7 @@ Rules:
       const response = await fetch('/api/agent-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ agent: synthAgent, messages: synthMessages }),
+        body: JSON.stringify({ agent: synthAgent, messages: synthMessages, sessionId: this.sessionId }),
       });
 
       if (response.ok) {

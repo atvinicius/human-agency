@@ -1,18 +1,19 @@
-// Streaming Edge Function for AI Agent Execution
+// Streaming Node.js Function for AI Agent Execution
 // Uses Vercel AI SDK for Server-Sent Events streaming
 // Supports web search tool for researcher/coordinator roles
 
 import { streamText, tool } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { z } from 'zod';
-import { getCorsHeaders } from './_config/cors.js';
-import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
+import { setNodeCorsHeaders } from './_config/cors.js';
+import { authenticateRequest } from './_middleware/auth.js';
 import { checkCredits, deductCredits, deductSearchCosts } from './_middleware/credits.js';
-import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
+import { checkRateLimit } from './_middleware/rateLimit.js';
 import { webSearch } from './search.js';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
+  maxDuration: 120,
 };
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -64,25 +65,19 @@ Be critical but constructive. Prioritize issues by severity.`,
 Focus on clarity and actionability. Make complex information accessible.`,
 };
 
-export default async function handler(req) {
-  const corsHeaders = getCorsHeaders(req);
+export default async function handler(req, res) {
+  setNodeCorsHeaders(res, req);
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   if (!OPENROUTER_API_KEY) {
-    return new Response(JSON.stringify({ error: 'OpenRouter API key not configured' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return res.status(500).json({ error: 'OpenRouter API key not configured' });
   }
 
   // Authenticate request — require auth when running with billing enabled
@@ -94,29 +89,31 @@ export default async function handler(req) {
   // Fail-fast: if billing infra is partially configured, refuse to serve unauthenticated.
   // This prevents silently giving away free API calls when env vars are misconfigured.
   if (!authUser && (authConfigured || OPENROUTER_API_KEY)) {
-    return unauthorizedResponse(corsHeaders);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
     // Rate limit per user (or IP for unauthenticated)
-    const rateLimitKey = authUser?.id || req.headers.get('x-forwarded-for') || 'anon';
+    const rateLimitKey = authUser?.id || req.headers['x-forwarded-for'] || 'anon';
     const rateCheck = checkRateLimit(rateLimitKey, 'agent');
     if (!rateCheck.allowed) {
-      return rateLimitResponse(rateCheck.retryAfterMs, corsHeaders);
+      const retryAfterSec = Math.ceil(rateCheck.retryAfterMs / 1000);
+      res.setHeader('Retry-After', String(retryAfterSec));
+      return res.status(429).json({
+        error: 'Too many requests',
+        retryAfter: retryAfterSec,
+      });
     }
 
-    const { agent, messages, sessionId } = await req.json();
+    const { agent, messages, sessionId } = req.body || {};
 
     // Credit check before making LLM call
     if (authUser) {
       const creditCheck = await checkCredits(authUser.id);
       if (creditCheck && !creditCheck.allowed) {
-        return new Response(JSON.stringify({
+        return res.status(402).json({
           error: 'Insufficient credits',
           balance: creditCheck.balance,
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
@@ -195,62 +192,60 @@ Respond with a JSON object containing:
       maxSteps: hasSearch ? 3 : 1,
       temperature: 0.7,
       maxTokens: 2000,
-      onFinish: async ({ usage }) => {
-        // Deduct credits after stream completes
-        if (authUser && usage) {
-          const modelId = agent.model || 'moonshotai/kimi-k2';
-          try {
-            const result = await deductCredits(
-              authUser.id, modelId,
-              usage.promptTokens || 0,
-              usage.completionTokens || 0,
-              sessionId || null
-            );
-            if (result && !result.success) {
-              console.error('[billing] Deduction rejected:', result.error, {
-                userId: authUser.id, modelId,
-                tokens: { prompt: usage.promptTokens, completion: usage.completionTokens },
-              });
-            }
-          } catch (err) {
-            // Critical: tokens were consumed but credits not deducted.
-            // Log enough context for manual reconciliation.
-            console.error('[billing] Deduction FAILED — needs reconciliation:', {
-              error: err.message,
-              userId: authUser.id,
-              modelId,
-              promptTokens: usage.promptTokens || 0,
-              completionTokens: usage.completionTokens || 0,
-              sessionId: sessionId || null,
-              timestamp: new Date().toISOString(),
-            });
-          }
+      // No onFinish — billing handled synchronously after stream
+    });
 
-          // Deduct search costs separately (if any searches were performed)
-          if (searchCount > 0) {
-            try {
-              await deductSearchCosts(authUser.id, searchCount, sessionId || null);
-            } catch (searchErr) {
-              console.error('[billing] Search deduction FAILED:', {
-                error: searchErr.message,
-                userId: authUser.id,
-                searchCount,
-                timestamp: new Date().toISOString(),
-              });
-            }
-          }
+    // Pipe stream to Node.js response (non-blocking)
+    result.pipeTextStreamToResponse(res);
+
+    // Wait for generation to complete, then deduct credits reliably
+    const usage = await result.usage;
+
+    if (authUser && usage) {
+      const modelId = agent.model || 'moonshotai/kimi-k2';
+      try {
+        const deductResult = await deductCredits(
+          authUser.id, modelId,
+          usage.promptTokens || 0,
+          usage.completionTokens || 0,
+          sessionId || null
+        );
+        if (deductResult && !deductResult.success) {
+          console.error('[billing] Stream deduction rejected:', deductResult.error, {
+            userId: authUser.id, modelId,
+            tokens: { prompt: usage.promptTokens, completion: usage.completionTokens },
+          });
         }
-      },
-    });
+      } catch (err) {
+        console.error('[billing] Stream deduction FAILED — needs reconciliation:', {
+          error: err.message, userId: authUser.id, modelId,
+          promptTokens: usage.promptTokens || 0,
+          completionTokens: usage.completionTokens || 0,
+          sessionId: sessionId || null,
+          timestamp: new Date().toISOString(),
+        });
+      }
 
-    return result.toTextStreamResponse({
-      headers: corsHeaders,
-    });
+      if (searchCount > 0) {
+        try {
+          await deductSearchCosts(authUser.id, searchCount, sessionId || null);
+        } catch (searchErr) {
+          console.error('[billing] Search deduction FAILED:', {
+            error: searchErr.message, userId: authUser.id, searchCount,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    } else if (authUser && !usage) {
+      console.warn('[billing] No usage data from stream — credits not deducted', {
+        userId: authUser.id, modelId: agent.model || 'moonshotai/kimi-k2',
+        sessionId: sessionId || null,
+      });
+    }
   } catch (error) {
     console.error('Agent stream error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 }

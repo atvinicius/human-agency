@@ -41,10 +41,22 @@ export async function checkCredits(userId) {
  * Uses atomic RPC to prevent race conditions.
  */
 export async function deductCredits(userId, modelId, promptTokens, completionTokens, sessionId = null) {
-  if (!supabaseAdmin || !userId) return null;
+  if (!supabaseAdmin) {
+    console.warn('[billing] deductCredits skipped — supabaseAdmin not configured');
+    return null;
+  }
+  if (!userId) {
+    console.warn('[billing] deductCredits skipped — no userId');
+    return null;
+  }
 
   const cost = calculateCost(modelId, promptTokens, completionTokens);
-  if (cost <= 0) return null;
+  if (cost <= 0) {
+    console.warn('[billing] deductCredits skipped — zero cost', {
+      modelId, promptTokens, completionTokens, userId, sessionId,
+    });
+    return null;
+  }
 
   const { data, error } = await supabaseAdmin.rpc('deduct_credits', {
     p_user_id: userId,
@@ -56,11 +68,20 @@ export async function deductCredits(userId, modelId, promptTokens, completionTok
   });
 
   if (error) {
-    console.error('Failed to deduct credits:', error);
+    console.error('[billing] deductCredits RPC error — needs reconciliation:', {
+      error: error.message, userId, modelId, cost, promptTokens, completionTokens, sessionId,
+      timestamp: new Date().toISOString(),
+    });
     return null;
   }
 
-  return data; // { success, balance, cost } or { success: false, error }
+  if (data && !data.success) {
+    console.warn('[billing] deductCredits rejected:', data.error, {
+      userId, modelId, cost, sessionId,
+    });
+  }
+
+  return data;
 }
 
 /**
@@ -68,7 +89,11 @@ export async function deductCredits(userId, modelId, promptTokens, completionTok
  * Applies platform markup to the per-search cost.
  */
 export async function deductSearchCosts(userId, searchCount, sessionId = null) {
-  if (!supabaseAdmin || !userId || searchCount <= 0) return null;
+  if (!supabaseAdmin) {
+    console.warn('[billing] deductSearchCosts skipped — supabaseAdmin not configured');
+    return null;
+  }
+  if (!userId || searchCount <= 0) return null;
 
   const cost = Math.round(searchCount * SEARCH_PRICING.cost_per_search * PLATFORM_MARKUP * 10000) / 10000;
   if (cost <= 0) return null;
@@ -84,8 +109,17 @@ export async function deductSearchCosts(userId, searchCount, sessionId = null) {
   });
 
   if (error) {
-    console.error('Failed to deduct search credits:', error);
+    console.error('[billing] deductSearchCosts RPC error — needs reconciliation:', {
+      error: error.message, userId, searchCount, cost, sessionId,
+      timestamp: new Date().toISOString(),
+    });
     return null;
+  }
+
+  if (data && !data.success) {
+    console.warn('[billing] deductSearchCosts rejected:', data.error, {
+      userId, searchCount, cost, sessionId,
+    });
   }
 
   return data;

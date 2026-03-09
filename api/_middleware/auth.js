@@ -18,7 +18,10 @@ export async function authenticateRequest(req) {
   // If Supabase auth is not configured, skip authentication (demo mode)
   if (!supabaseAuth) return null;
 
-  const authHeader = req.headers.get('Authorization');
+  // Support both Edge `Request` (headers.get) and Node.js `req` (headers plain object)
+  const authHeader = typeof req.headers.get === 'function'
+    ? req.headers.get('Authorization')
+    : req.headers['authorization'];
   if (!authHeader?.startsWith('Bearer ')) return null;
 
   const token = authHeader.slice(7);
