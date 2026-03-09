@@ -95,7 +95,7 @@ export function canSpawn(agents, parentAgentId, budget) {
  */
 export function createAgentFromConfig(config, sessionId, parentId = null, depth = 0) {
   const safe = sanitizeSpawnConfig(config);
-  return {
+  const agent = {
     id: crypto.randomUUID(),
     session_id: sessionId,
     parent_id: parentId,
@@ -111,4 +111,9 @@ export function createAgentFromConfig(config, sessionId, parentId = null, depth 
     depth,
     iteration: 0,
   };
+  // Complexity-based iteration limit (LLM-provided or null for role default)
+  if (config.max_iterations && Number.isFinite(config.max_iterations)) {
+    agent.max_iterations = Math.min(Math.max(Math.round(config.max_iterations), 2), 10);
+  }
+  return agent;
 }

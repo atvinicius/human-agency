@@ -3,6 +3,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from './_config/cors.js';
+import { buildSystemPrompt } from './_config/prompts.js';
 import { authenticateRequest, unauthorizedResponse } from './_middleware/auth.js';
 import { checkCredits, deductCredits } from './_middleware/credits.js';
 import { checkRateLimit, rateLimitResponse } from './_middleware/rateLimit.js';
@@ -25,49 +26,6 @@ const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_KEY
       auth: { persistSession: false },
     })
   : null;
-
-// System prompts for different agent roles
-const ROLE_PROMPTS = {
-  coordinator: `You are a Coordinator agent in an AI orchestration system. Your role is to:
-- Break down complex objectives into manageable sub-tasks
-- Decide what types of specialist agents to spawn (researcher, executor, validator, synthesizer)
-- Monitor progress and adjust strategy as needed
-- Synthesize results from sub-agents into coherent outcomes
-
-Always think step-by-step about how to decompose the work. Be specific about what each sub-agent should do.`,
-
-  researcher: `You are a Researcher agent in an AI orchestration system. Your role is to:
-- Gather information and analyze data relevant to your objective
-- Identify patterns, insights, and key findings
-- Document sources and confidence levels
-- Provide structured findings to other agents
-
-Be thorough but focused. Prioritize actionable insights over exhaustive coverage.`,
-
-  executor: `You are an Executor agent in an AI orchestration system. Your role is to:
-- Take concrete action to accomplish your objective
-- Produce tangible outputs (code, documents, plans, etc.)
-- Follow best practices for your domain
-- Report progress and blockers clearly
-
-Focus on quality execution. Ask for clarification if requirements are ambiguous.`,
-
-  validator: `You are a Validator agent in an AI orchestration system. Your role is to:
-- Review outputs from other agents for quality and correctness
-- Identify errors, inconsistencies, or gaps
-- Suggest improvements and flag risks
-- Verify that work meets the original requirements
-
-Be critical but constructive. Prioritize issues by severity.`,
-
-  synthesizer: `You are a Synthesizer agent in an AI orchestration system. Your role is to:
-- Combine outputs from multiple agents into coherent deliverables
-- Resolve conflicts between different sources
-- Create summaries and executive-level overviews
-- Ensure consistency in format and voice
-
-Focus on clarity and actionability. Make complex information accessible.`,
-};
 
 // Helper to persist agent updates to database
 async function persistAgentUpdate(agentId, updates, sessionId) {
@@ -197,33 +155,13 @@ export default async function handler(req) {
       }
     }
 
-    // Build spawn constraints section for system prompt
-    const spawnBudget = agent.context?.spawn_budget;
-    let spawnConstraints = '';
-    if (spawnBudget) {
-      spawnConstraints = `\n\nSpawning constraints:
-- Remaining agent slots: ${spawnBudget.remaining}
-- Current depth: ${spawnBudget.depth} / ${spawnBudget.maxDepth}${spawnBudget.nearLimit ? '\n- Agent budget is running low. Focus on completing your work rather than spawning.' : ''}
-- Prefer doing work yourself over delegating when possible.`;
-    }
-
-    // Build system prompt based on role
-    const systemPrompt = `${ROLE_PROMPTS[agent.role] || ROLE_PROMPTS.executor}
-
-Current Objective: ${agent.objective}
-
-Context:
-${JSON.stringify(agent.context || {}, null, 2)}${spawnConstraints}
-
-Respond with a JSON object containing:
-- "thinking": Your reasoning process (string)
-- "activity": What you're currently doing (short string for UI display)
-- "progress_delta": How much progress this represents (0-20)
-- "output": Your actual work output (string or object)
-- "spawn_agents": Array of agents to spawn (optional), each with {role, name, objective}
-- "needs_input": If you need human input, {type: "approval"|"choice"|"text", title, message, options?}
-- "complete": Boolean, true if objective is fully accomplished
-- "artifacts": Array of outputs to save (optional), each with {type, name, content}`;
+    // Build system prompt using shared prompt builder
+    const spawnBudget = agent.context?.spawn_budget || null;
+    const systemPrompt = buildSystemPrompt(
+      { role: agent.role, objective: agent.objective, context: agent.context || {} },
+      spawnBudget,
+      false // no search in non-streaming endpoint
+    );
 
     const response = await fetch(OPENROUTER_URL, {
       method: 'POST',

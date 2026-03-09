@@ -2,24 +2,6 @@
 // All functions take a Supabase admin client and return query results.
 
 /**
- * Claim one working agent for processing using SKIP LOCKED.
- * This prevents multiple workers from processing the same agent.
- *
- * @param {object} supabase - Supabase admin client
- * @param {string} sessionId - Session to claim from
- * @returns {object|null} Claimed agent row, or null if none available
- */
-export async function claimAgent(supabase, sessionId) {
-  // Use raw SQL for FOR UPDATE SKIP LOCKED (not supported by PostgREST)
-  const { data, error } = await supabase.rpc('claim_agent_for_iteration', {
-    p_session_id: sessionId,
-  });
-
-  if (error || !data) return null;
-  return data;
-}
-
-/**
  * Load all messages for an agent ordered by seq.
  *
  * @param {object} supabase

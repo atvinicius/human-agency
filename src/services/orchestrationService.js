@@ -813,7 +813,11 @@ export class OrchestrationService {
           }
 
           // Adaptive: re-poll faster when work was done, slow down when idle
-          if (result.action === 'iterated' || result.action === 'completed') {
+          if (result.action === 'iterated' || result.action === 'completed' || result.action === 'waiting_for_input') {
+            nextDelay = FAST_INTERVAL;
+          }
+          // With batch iteration, batchSize > 1 means multiple agents were processed
+          if (result.batchSize > 1) {
             nextDelay = FAST_INTERVAL;
           }
         }
