@@ -5,6 +5,7 @@ import { useThemeStore } from './stores/themeStore';
 import { useAuthStore } from './stores/authStore';
 import { isSupabaseConfigured } from './lib/supabase';
 import Landing from './pages/Landing';
+import Manifesto from './pages/Manifesto';
 import Demo from './pages/Demo';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
@@ -53,6 +54,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/manifesto" element={<Manifesto />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route

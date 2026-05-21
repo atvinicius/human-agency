@@ -1,38 +1,37 @@
 # The Human Agency Manifesto
-**The Economic Case for the Infinite Individual**
 
-### I. The Zero-Cost Axiom
-We are witnessing the most violent economic shift in history: the marginal cost of cognitive execution is collapsing to zero.
+_A practical thesis for agent orchestration._
 
-For centuries, value was constrained by labor. To build more software, you needed more engineers. To close more deals, you needed more associates. Human intelligence was the bottleneck.
+When AI makes execution abundant, the scarce resource becomes human direction.
 
-That era is over. With the rise of generative models and autonomous agents, intelligence has become a commodity—abundant, instant, and infinitely scalable.
+## The cost of cognitive execution is falling
 
-### II. The Ratio Crisis
-The prevailing fear is that AI will replace humans. This is a category error. AI does not replace the human; it replaces the **constraint** on the human.
+For a long time, the amount of useful work a person could produce was constrained by available labor. More research required more analysts. More software required more engineers. More exploration required more hours.
 
-However, we face a critical breaking point: **The Interface Gap.**
+AI changes the shape of that constraint. A single person can now generate drafts, run searches, compare options, write code, summarize documents, and test ideas at a scale that used to require a team.
 
-Current software is designed for a **1:1 Ratio** (one human using one tool to do one task). The future demands a **1:1,000,000 Ratio** (one human directing a swarm of one million agents).
+That does not make the human irrelevant. It changes where the human is most valuable.
 
-Today, if a human tries to manage 100 AI agents, they drown in noise. We lack the orchestration layer to wield the power we have created. Without this layer, human value collapses. With it, human value becomes infinite.
+## The interface has not caught up
 
-### III. The Sovereign Operator
-We reject the pessimism of "post-labor" obsolescence. We believe in the rise of the **Sovereign Operator**.
+Most software still assumes one person using one tool to complete one task. Agentic systems break that pattern. A person may want several agents exploring different hypotheses, checking each other, gathering sources, and converging on a decision.
 
-In this new economy, the human does not compete with the machine on *execution* (writing code, analyzing data, generating pixels). The human monopolizes *Intent* and *Judgment*.
+The problem is not that agents can do too little. The problem is that delegated work quickly becomes hard to supervise. A pile of chats is not an operating model.
 
-* **AI solves.** Humans define *what* to solve.
-* **AI explores.** Humans define the *boundary*.
-* **AI generates.** Humans provide the *sanction*.
+The missing layer is an interface for intent, boundaries, evidence, intervention, and review.
 
-The value of the future worker is not defined by their output, but by their leverage. The junior engineer of 2026 must have the output capacity of the entire engineering department of 2024.
+## The operator becomes the point of leverage
 
-### IV. What We Are Building
-**Human Agency** is the operating system for this new scale.
+In an AI-heavy workflow, the human should not compete with machines on raw execution. The human should define the mission, set the constraints, decide what is good enough, and remain accountable for the result.
 
-We are not building another chatbot. We are building the **Orchestration Layer** that allows a single human mind to drive an army of synthetic workers.
+AI can search. The human decides what question is worth searching. AI can generate options. The human decides which tradeoffs are acceptable. AI can produce a report. The human decides whether the evidence is strong enough to act.
 
-We are building the infrastructure that validates, aggregates, and directs AI labor, ensuring that as the leverage of the machine approaches infinity, the agency of the human remains absolute.
+Agency is not doing every step by hand. Agency is keeping authorship over direction and judgment when more of the work is delegated.
 
-The era of the infinite individual.
+## What Human Agency is building
+
+Human Agency is a mission control surface for delegated AI work. It is meant to help one person launch agent teams, see what they are doing, inspect their sources, interrupt weak paths, and approve the final synthesis.
+
+The product is early, and the first version over-indexed on the drama of the idea. The useful version is more grounded: fewer theatrics, better supervision, clearer reports, and stronger human checkpoints.
+
+The thesis remains simple: as AI makes execution cheaper, the product layer that matters is the one that preserves human direction.
